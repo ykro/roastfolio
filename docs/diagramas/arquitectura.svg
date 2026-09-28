@@ -3,7 +3,7 @@
       <title id="arquitectura-title">Arquitectura de Roastfolio en Google Cloud</title>
       <desc id="arquitectura-desc">Diagrama de arquitectura: el usuario entra por un Load Balancer HTTPS con Cloud CDN para los buckets site y cards y Cloud Armor para la API; Cloud Run web guarda el PDF, crea el roast en Firestore y encola una tarea en Cloud Tasks, que invoca con OIDC al worker interno, el cual usa Document AI, Gemini, Nano Banana y Apify y publica el certificado en cards.</desc>
       <defs>
-        <style>@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..700;1,62..125,400..700&amp;family=Courier+Prime:wght@400;700&amp;display=swap');</style>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&amp;family=Courier+Prime:wght@400;700&amp;display=swap');</style>
         <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4c5a8f"/></marker>
         <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#c4232b"/></marker>
         <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2f7d6b"/></marker>
@@ -12,10 +12,10 @@
       <rect width="100%" height="100%" fill="#f7faf7"/>
 
       <!-- ============ ZONES (drawn first) ============ -->
-      <!-- Borde público -->
+      <!-- Edge público -->
       <rect x="156" y="80" width="360" height="296" rx="8" fill="#22306b" fill-opacity="0.02" stroke="#22306b" stroke-opacity="0.16" stroke-width="0.8"/>
       <rect x="164" y="84" width="140" height="12" rx="2" fill="#f7faf7"/>
-      <text x="170" y="93" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" letter-spacing="0.14em">BORDE · ENTRADA PÚBLICA</text>
+      <text x="170" y="93" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" letter-spacing="0.14em">EDGE · ENTRADA PÚBLICA</text>
 
       <!-- Red interna (trust boundary) -->
       <rect x="536" y="252" width="500" height="308" rx="8" fill="#22306b" fill-opacity="0.02" stroke="#4c5a8f" stroke-opacity="0.55" stroke-width="0.9" stroke-dasharray="4,4"/>

@@ -34,6 +34,9 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" --condition=None --quiet \
   --member="serviceAccount:$SA_BUILD" --role=roles/serviceusage.serviceUsageConsumer >/dev/null
 gcloud storage buckets add-iam-policy-binding "gs://${PROJECT_ID}_cloudbuild" \
   --member="serviceAccount:$SA_BUILD" --role=roles/storage.objectAdmin >/dev/null
+# gcloud builds submit also reads the bucket's metadata before uploading.
+gcloud storage buckets add-iam-policy-binding "gs://${PROJECT_ID}_cloudbuild" \
+  --member="serviceAccount:$SA_BUILD" --role=roles/storage.legacyBucketReader >/dev/null
 gcloud iam service-accounts add-iam-policy-binding "$SA_BUILD" --role=roles/iam.serviceAccountUser \
   --member="serviceAccount:$SA_BUILD" --quiet >/dev/null
 

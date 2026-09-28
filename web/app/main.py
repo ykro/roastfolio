@@ -133,7 +133,7 @@ def create_app(store: Store | None = None, queue: Queue | None = None, s: Settin
             "source": source,
             "sourceRef": source_ref,
             "intensity": intensity,
-            "profile": None,
+            "profileText": None,
             "result": None,
             "cardPath": None,
             "error": None,

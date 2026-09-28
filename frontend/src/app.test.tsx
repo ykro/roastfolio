@@ -4,12 +4,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { Home } from './Home'
 import { RoastPage } from './RoastPage'
 
+const tip = (n: string) => ({ title: `Consejo ${n}`, why: 'Porque sí', before: `Antes ${n}`, after: `Después ${n}` })
 const result = {
   name: 'María López',
   headline: 'Mucha sinergia, poca evidencia',
   roast: 'Tu perfil tiene más buzzwords que un pitch.',
+  burns: [{ quote: 'Ninja de Innovación', joke: 'Tan ninja que nadie vio resultados.' }],
+  closer: 'De meme a match.',
   score: 4,
-  tips: ['Consejo uno', 'Consejo dos', 'Consejo tres'],
+  tips: [tip('uno'), tip('dos'), { ...tip('tres'), before: 'No existe' }],
 }
 const base = { id: 'abcdefghijklmnopqrstuv', intensity: 'brutal', source: 'pdf', expiresAt: new Date(Date.now() + 86_400_000).toISOString() }
 
@@ -68,6 +71,13 @@ describe('Home', () => {
 })
 
 describe('RoastPage', () => {
+  it('shows progress until the roast text exists', async () => {
+    mockFetch({ status: 200, body: { ...base, status: 'roasting' } })
+    render(<RoastPage id={base.id} onNew={() => {}} />)
+    expect(await screen.findByText('Tu trámite está en proceso')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).toBeInTheDocument()
+  })
+
   it('shows the roast while the card is still rendering, then the card', async () => {
     mockFetch(
       { status: 200, body: { ...base, status: 'rendering', result } },
@@ -76,11 +86,32 @@ describe('RoastPage', () => {
     render(<RoastPage id={base.id} onNew={() => {}} />)
     expect(await screen.findByText('Mucha sinergia, poca evidencia')).toBeInTheDocument()
     expect(screen.getByText('Imprimiendo tu certificado…')).toBeInTheDocument()
-    expect(screen.getByText('Tu trámite está en proceso')).toBeInTheDocument()
+    expect(screen.getByText('Ninja de Innovación')).toBeInTheDocument()
+    expect(screen.getByText('De meme a match.')).toBeInTheDocument()
     expect(await screen.findByRole('img', {}, { timeout: 4000 })).toHaveAttribute('src', '/cards/x.jpg')
     expect(screen.getByText('Consejo tres')).toBeInTheDocument()
+    expect(screen.getByText('Después tres')).toBeInTheDocument()
+    expect(screen.getByText('Esta sección no existe en tu perfil.')).toBeInTheDocument()
     expect(screen.getByLabelText('Calificación: 4 de 10')).toBeInTheDocument()
-    expect(screen.queryByText('Tu trámite está en proceso')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copiar enlace' })).toBeInTheDocument()
+  })
+
+  it('still renders roasts made with the old plain-text tips', async () => {
+    const old = { ...result, burns: undefined, closer: undefined, tips: ['Consejo viejo', 'b', 'c'] }
+    mockFetch({ status: 200, body: { ...base, status: 'done', result: old, cardUrl: '/cards/x.jpg' } })
+    render(<RoastPage id={base.id} onNew={() => {}} />)
+    expect(await screen.findByText('Consejo viejo')).toBeInTheDocument()
+    expect(screen.queryByText('Observaciones del revisor')).not.toBeInTheDocument()
+  })
+
+  it('copies the rewritten text of a tip', async () => {
+    const user = userEvent.setup()
+    mockFetch({ status: 200, body: { ...base, status: 'done', result, cardUrl: '/cards/x.jpg' } })
+    render(<RoastPage id={base.id} onNew={() => {}} />)
+    const [first] = await screen.findAllByRole('button', { name: 'Copiar' })
+    await user.click(first)
+    expect(await navigator.clipboard.readText()).toBe('Después uno')
+    expect(screen.getByRole('button', { name: 'Copiado' })).toBeInTheDocument()
   })
 
   it('shows the expired state for a missing roast', async () => {

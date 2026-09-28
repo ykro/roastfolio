@@ -25,7 +25,7 @@ export function App() {
   const id = roastIdFrom(path)
   return (
     <>
-      <nav className="mx-auto flex max-w-3xl items-center justify-between px-4 pt-5 sm:px-8">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 pt-5 sm:px-8">
         <a
           href="/"
           onClick={(e) => {
@@ -36,6 +36,18 @@ export function App() {
         >
           Roastfolio
         </a>
+        {id && (
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault()
+              go('/')
+            }}
+            className="font-semibold underline decoration-2 underline-offset-4 hover:text-stamp"
+          >
+            Hacer otro roast
+          </a>
+        )}
       </nav>
       {id ? <RoastPage key={id} id={id} onNew={() => go('/')} /> : <Home onCreated={(rid) => go(`/r/${rid}`)} />}
     </>

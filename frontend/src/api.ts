@@ -1,12 +1,28 @@
 export type Intensity = 'soft' | 'medium' | 'brutal'
 export type Status = 'queued' | 'extracting' | 'roasting' | 'rendering' | 'done' | 'failed'
 
+export interface Burn {
+  quote: string
+  joke: string
+}
+
+export interface Tip {
+  title: string
+  why: string
+  before: string
+  after: string
+}
+
 export interface RoastResult {
   name: string
   headline: string
+  /** Opening lines. Roasts made before burns existed carry the whole text here. */
   roast: string
+  burns?: Burn[]
+  closer?: string
   score: number
-  tips: string[]
+  /** Plain strings in roasts made before the before/after format. */
+  tips: (Tip | string)[]
 }
 
 export interface Roast {

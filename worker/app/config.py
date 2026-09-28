@@ -19,6 +19,7 @@ class Settings:
     genai_location: str = os.getenv("GENAI_LOCATION", "global")
     text_model: str = os.getenv("GEMINI_TEXT_MODEL", "gemini-3.8-flash")
     image_model: str = os.getenv("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-lite-image")
+    thinking_level: str = os.getenv("GEMINI_THINKING_LEVEL", "low")
     apify_actor: str = os.getenv("APIFY_ACTOR", "harvestapi~linkedin-profile-scraper")
     apify_token_secret: str = os.getenv("APIFY_TOKEN_SECRET", "apify-token")
     max_attempts: int = int(os.getenv("MAX_ATTEMPTS", "4"))

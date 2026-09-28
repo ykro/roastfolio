@@ -1,6 +1,5 @@
 """Step 1 (extracting): PDF -> Document AI Layout Parser, LinkedIn URL -> Apify. Output: plain text."""
 
-import json
 import re
 from functools import lru_cache
 
@@ -10,11 +9,6 @@ from .config import Settings
 from .errors import PermanentError
 
 MAX_CHARS = 30_000
-APIFY_FIELDS = (
-    "firstName", "lastName", "headline", "about", "location", "experience",
-    "education", "skills", "topSkills", "certifications", "projects", "languages",
-    "honorsAndAwards", "volunteering",
-)
 
 
 def _flatten_blocks(blocks, out: list[str]) -> None:
@@ -86,8 +80,45 @@ def linkedin_to_text(url: str, s: Settings) -> str:
     item = items[0] if isinstance(items, list) and items else None
     if not item or not (item.get("firstName") or item.get("experience")):
         raise PermanentError("No encontramos ese perfil de LinkedIn o no es público.")
-    trimmed = {k: _prune(item[k]) for k in APIFY_FIELDS if item.get(k)}
-    return json.dumps(trimmed, ensure_ascii=False)[:MAX_CHARS]
+    return linkedin_as_resume(item)[:MAX_CHARS]
+
+
+SECTION_LABELS = {
+    "headline": "Titular", "about": "Acerca de", "location": "Ubicación", "experience": "Experiencia",
+    "education": "Educación", "skills": "Aptitudes", "topSkills": "Aptitudes principales",
+    "certifications": "Licencias y certificaciones", "projects": "Proyectos", "languages": "Idiomas",
+    "honorsAndAwards": "Reconocimientos y premios", "volunteering": "Voluntariado",
+}
+_SKIP = {"startDate", "endDate", "parsed", "description"}
+
+
+def _plain(value) -> str:
+    """One entry as a CV line: values only, so the model quotes content and never field names."""
+    if isinstance(value, dict):
+        if "text" in value or "linkedinText" in value:
+            return str(value.get("linkedinText") or value["text"])
+        parts = [", ".join(map(_plain, v)) if isinstance(v, list) else _plain(v)
+                 for k, v in value.items() if k not in _SKIP]
+        start, end = value.get("startDate"), value.get("endDate")
+        if (start or end) and not value.get("period"):
+            parts.append(f"{_plain(start) if start else '?'} – {_plain(end) if end else 'actualidad'}")
+        line = " · ".join(p for p in parts if p)
+        if value.get("description"):
+            line += "\n  " + str(value["description"]).replace("\n", "\n  ")
+        return line
+    if isinstance(value, list):
+        return "\n".join("- " + _plain(v) for v in value)
+    return str(value)
+
+
+def linkedin_as_resume(item: dict) -> str:
+    """Apify JSON -> plain text laid out like a CV (same input shape as a PDF for the roast prompt)."""
+    lines = [" ".join(filter(None, [item.get("firstName"), item.get("lastName")]))]
+    for key, label in SECTION_LABELS.items():
+        value = _prune(item.get(key))
+        if value not in (None, "", [], {}):
+            lines += ["", f"{label}:", _plain(value)]
+    return "\n".join(lines).strip()
 
 
 _NOISE = re.compile(r"(url|urn|logo|picture|photo|id)$", re.IGNORECASE)

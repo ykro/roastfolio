@@ -1,148 +1,330 @@
 # Roastfolio
 
-App web que "roastea" un perfil profesional con humor y devuelve consejos reales. Subes tu CV en PDF (o pegas la URL de tu perfil de LinkedIn), eliges la intensidad y en menos de un minuto recibes un titular, un roast, una calificación del 1 al 10, tres consejos accionables y un certificado compartible generado con Nano Banana. Todo se borra a las 24 horas.
+Subes tu CV en PDF o pegas la URL de tu perfil de LinkedIn, eliges qué tan duro quieres que te traten y en menos de un minuto recibes:
 
-Es la demo de arquitectura del curso de Cloud: cada pieza usa un servicio distinto de Google Cloud y cada servicio tiene su artículo.
+- un titular;
+- un roast con humor;
+- una calificación del 1 al 10;
+- tres consejos que sí sirven;
+- un certificado oficial de roast, generado con Nano Banana, listo para compartir.
+
+A las 24 horas todo se borra solo.
+
+Es la demo de arquitectura del curso de Cloud: una app pequeña, pero con los problemas de una app real. Recibe tráfico que se comparte, hace llamadas caras a modelos de IA, procesa en segundo plano, maneja datos personales que no deben quedarse y necesita un deploy automático. Cada problema se resuelve con un servicio de Google Cloud; en total son 13.
 
 **En vivo:** https://34.117.137.57.nip.io
 
+| Documento | Para qué |
+|---|---|
+| [Guía de onboarding](docs/ONBOARDING.md) | Correr la app en local, entender el código y hacer tu primer cambio |
+| [Costos](docs/COSTOS.md) | Estimación mensual por servicio con precios de lista y consumo medido |
+| [Terraform](terraform/README.md) | La infraestructura como código: adoptar lo existente o crear todo desde cero |
+| [Diagramas](docs/diagramas/) | Fuentes HTML y exportaciones SVG/PNG de los diagramas de este README |
+
+## Contenido
+
+1. [Qué hace](#qué-hace)
+2. [Arquitectura](#arquitectura)
+3. [Servicios](#servicios)
+4. [Seguridad](#seguridad)
+5. [Costos](#costos)
+6. [Despliegue](#despliegue)
+7. [Progreso del proyecto](#progreso-del-proyecto)
+8. [Estructura del repo](#estructura-del-repo)
+
+## Qué hace
+
+1. Entras a la landing y subes un PDF (máximo 5 MB y 5 páginas) o pegas la URL de un perfil de LinkedIn. Si es URL, confirmas que es tu perfil o que tienes permiso.
+2. Eliges la intensidad: **suave**, **medio** o **brutal**.
+3. Ves el avance en vivo: *extrayendo → roasteando → generando certificado*.
+4. Lees el roast apenas existe, sin esperar la imagen.
+5. Compartes el link `/r/{id}`: en WhatsApp, LinkedIn o X la vista previa es tu certificado.
+
+El modelo se burla solo de lo profesional: buzzwords, títulos inflados, cargos de tres meses. Nunca de la apariencia, la edad, el género, el origen o el nombre. La calificación no depende de la intensidad: un perfil de 7 sigue siendo de 7 aunque pidas que lo destrocen.
+
+No hay cuentas, login, historial ni pagos.
+
 ## Arquitectura
 
-```mermaid
-flowchart LR
-    U[Usuario] -->|HTTPS| LB[Load Balancer<br/>+ Cloud Armor]
-    LB -->|/*| SITE[(bucket site<br/>+ Cloud CDN)]
-    LB -->|/cards/*| CARDS[(bucket cards<br/>+ Cloud CDN)]
-    LB -->|/api/*, /r/*| WEB[Cloud Run web]
-    WEB --> UP[(bucket uploads)]
-    WEB --> FS[(Firestore)]
-    WEB -->|tarea| CT[Cloud Tasks]
-    CT -->|OIDC sa-tasks| WK[Cloud Run worker]
-    WK --> DAI[Document AI<br/>Layout Parser]
-    WK --> APY[Apify<br/>token en Secret Manager]
-    WK --> GEM[Gemini 3.8 Flash]
-    WK --> NB[Nano Banana 2 Lite]
-    WK --> CARDS
-    WK --> FS
+![Arquitectura de Roastfolio en Google Cloud](docs/diagramas/arquitectura.png)
+
+Todo entra por **un solo Load Balancer HTTPS global**, protegido con Cloud Armor. El URL map decide por path:
+
+| Path | Destino | Caché |
+|---|---|---|
+| `/api/*`, `/r/*` | Cloud Run `roastfolio-web` (serverless NEG) | no |
+| `/cards/*` | bucket `cards` (backend bucket) | Cloud CDN, máximo 1 hora |
+| todo lo demás | bucket `site`, el build de React (backend bucket) | Cloud CDN según `Cache-Control`: assets con hash 1 año, `index.html` sin caché |
+
+El puerto 80 solo redirige a HTTPS. El dominio es `<IP>.nip.io`: un DNS comodín público que resuelve a la IP del Load Balancer. Gracias a él, el certificado administrado de Google se emite sin comprar un dominio.
+
+### El recorrido de un roast
+
+![Secuencia de un roast](docs/diagramas/secuencia.png)
+
+1. **`web`** recibe `POST /api/roasts`, valida la entrada, guarda el PDF en el bucket privado `uploads`, crea `roasts/{id}` en Firestore con estado `queued` y encola una tarea en Cloud Tasks. Responde con el `id` en menos de un segundo. Nada pesado pasa en esa solicitud.
+2. **Cloud Tasks** llama a `roastfolio-worker` con un token OIDC de `sa-tasks`. Tiene 5 envíos en paralelo, 2 por segundo y 4 intentos con backoff de 10 a 120 s. El límite de concurrencia protege las cuotas de Vertex AI cuando llega un pico.
+3. **`worker`** hace el trabajo pesado:
+   - extrae el texto con Document AI (PDF) o con Apify (LinkedIn);
+   - escribe el roast con `gemini-3.8-flash` y un JSON schema fijo;
+   - genera el certificado con Nano Banana (`gemini-3.1-flash-lite-image`) y lo convierte a JPEG de 1200×630 y menos de 300 KB;
+   - lo sube a `cards`.
+4. **El navegador** consulta `GET /api/roasts/{id}` cada 2 segundos y muestra cada avance.
+5. **`/r/{id}`** devuelve el `index.html` del sitio con meta tags Open Graph que apuntan al certificado. Por eso el link compartido tiene vista previa.
+
+### Estados y reintentos
+
+![Máquina de estados de un roast](docs/diagramas/estados.png)
+
+Firestore guarda cada roast como una máquina de estados: `queued → extracting → roasting → rendering → done | failed`.
+
+**Cada paso guarda su resultado antes de avanzar.** Si el worker se cae a media ejecución, Cloud Tasks reintenta y el worker retoma desde el último paso guardado, sin volver a pagar Document AI ni Gemini.
+
+Los errores se separan en dos grupos:
+
+- **Permanentes:** PDF ilegible, perfil privado, contenido bloqueado por los filtros de seguridad. Pasan directo a `failed` con un mensaje claro, porque reintentar no los arregla.
+- **Pasajeros:** un 503 de Vertex, un timeout. Se reintentan, y solo en el último intento el roast pasa a `failed`.
+
+**Expiración.** Todo roast tiene `expiresAt = creación + 24 h`. Una política TTL de Firestore borra el documento, y el lifecycle de `uploads` y `cards` borra los archivos. Esos borrados son asíncronos y pueden tardar hasta un día más, así que la API trata como expirado cualquier roast con `expiresAt` en el pasado, exista o no el documento.
+
+## Servicios
+
+| # | Servicio | Rol en Roastfolio | Cómo se integra |
+|---|---|---|---|
+| 1 | **Cloud Run** | Cómputo de `roastfolio-web` (API y páginas `/r/{id}`) y `roastfolio-worker` (pipeline) | Web: 512 MiB, 40 requests por instancia, ingress `internal-and-cloud-load-balancing`. Worker: 1 GiB, 4 por instancia, ingress `internal`. Ambos escalan de 0 a 5 |
+| 2 | **Cloud Storage** | `site` (frontend), `uploads` (PDFs) y `cards` (certificados) | `site` y `cards` son públicos solo como backend buckets del LB. `uploads` es privado, con *public access prevention*. `uploads` y `cards` borran objetos de más de 1 día |
+| 3 | **Firestore** | Estado y resultado de cada roast | Base `roastfolio`, colección `roasts`, política TTL sobre `expiresAt` |
+| 4 | **Cloud Tasks** | Cola del pipeline | Cola `roasts`: tareas HTTP con OIDC hacia el worker, concurrencia 5 y 4 intentos |
+| 5 | **Document AI** | PDF → texto con estructura | Procesador Layout Parser en la multirregión `us` |
+| 6 | **Vertex AI (Gemini)** | Roast con salida JSON (directo del texto extraído) y certificado con Nano Banana | `gemini-3.8-flash` y `gemini-3.1-flash-lite-image`, endpoint `global` |
+| 7 | **Cloud Load Balancing** | Entrada única HTTPS | IP global, URL map por path, certificado administrado para `<IP>.nip.io`, redirect 80 → 443 |
+| 8 | **Cloud CDN** | Caché del frontend y de los certificados | Activado en los backend buckets `site` y `cards` |
+| 9 | **Cloud Armor** | WAF y rate limiting | Política `rf-armor` en el backend de web: 8 reglas OWASP y 2 límites por IP |
+| 10 | **IAM** | Una identidad por componente | `sa-web`, `sa-worker`, `sa-tasks` y `sa-build`, con roles sobre el recurso concreto ([detalle](#identidades-y-permisos)) |
+| 11 | **Cloud Build + Artifact Registry** | CI/CD e imágenes | Trigger en push a `main` conectado a GitHub. Repositorio Docker con política de limpieza |
+| 12 | **Cloud Logging + Monitoring** | Observabilidad | Logs JSON, 4 métricas basadas en logs, alerta por tasa de error y dashboard |
+| 13 | **Secret Manager** | La única llave del sistema | Secreto `apify-token`: solo `sa-worker` lo puede leer. El worker lo pide a Secret Manager la primera vez que lo necesita; nunca es una variable de entorno |
+
+Fuera de GCP solo está **Apify**, un actor de scraping que devuelve el perfil público de LinkedIn. Desde IPs de GCP, LinkedIn responde casi siempre con su pantalla de login, y Apify resuelve eso sin cookies.
+
+### Observabilidad
+
+- **Logs JSON a stdout** con `roastId`, `step`, `event` y `durationMs`. Filtrar por `roastId` muestra la historia completa de un roast.
+- **Métricas basadas en logs:**
+  - roasts encolados, terminados y fallidos (`event` = `roast_queued`, `roast_done`, `roast_failed`);
+  - duración por paso (`step_finished`, distribución).
+- **Alerta** por correo cuando fallan más del 10 % de los roasts en 15 minutos (solo con 5 roasts o más en la ventana, para que uno solo no dispare la alarma).
+- **Dashboard "Roastfolio"** con roasts por hora, latencia p95 por paso y cache hit ratio del CDN.
+
+## Seguridad
+
+### Perímetro
+
+- **Una sola puerta.** `roastfolio-web` tiene ingress `internal-and-cloud-load-balancing`: su URL `*.run.app` responde 404 desde internet y solo acepta tráfico que llega por el Load Balancer. `roastfolio-worker` tiene ingress `internal`: ni siquiera el Load Balancer lo alcanza, solo Cloud Tasks.
+- **HTTPS siempre.** El certificado es administrado por Google y el puerto 80 solo redirige.
+- **Cloud Armor** en el backend de web:
+
+| Prioridad | Regla | Acción |
+|---|---|---|
+| 1000–1070 | OWASP CRS 3.3 con sensibilidad 1: SQLi, XSS, LFI, RFI, RCE, method enforcement, scanner detection, protocol attack | 403 |
+| 2000 | Más de 5 `POST /api/roasts` por IP en 10 minutos | 429 |
+| 2100 | Más de 300 requests por IP en 1 minuto | 429 |
+
+El WAF no inspecciona `POST /api/roasts`, porque el cuerpo es un PDF binario y las firmas de inyección dan falsos positivos con bytes aleatorios. Esa ruta la cubren el rate limit más estricto y la validación de la app.
+
+### Identidades y permisos
+
+Ninguna identidad usa llaves JSON. Cada servicio corre con su propia service account, y los roles se dan sobre el recurso concreto siempre que GCP lo permite.
+
+| Service account | Qué puede hacer | Dónde |
+|---|---|---|
+| `sa-web` | Crear objetos (no leer ni borrar) | bucket `uploads` |
+| | Leer y escribir documentos | Firestore (proyecto) |
+| | Encolar tareas | cola `roasts` |
+| | Firmar tokens OIDC como `sa-tasks` (`serviceAccountUser`) | `sa-tasks` |
+| `sa-worker` | Leer PDFs | bucket `uploads` |
+| | Escribir certificados | bucket `cards` |
+| | Leer y escribir documentos | Firestore (proyecto) |
+| | Usar Document AI y Vertex AI | proyecto |
+| | Leer el token de Apify | secreto `apify-token` |
+| `sa-tasks` | Invocar el worker (`run.invoker`), y nada más | servicio `roastfolio-worker` |
+| `sa-build` | Desplegar revisiones (`run.developer`) | servicios `roastfolio-web` y `roastfolio-worker` |
+| | Subir imágenes | repositorio `roastfolio` de Artifact Registry |
+| | Publicar el frontend | bucket `site` |
+| | Desplegar revisiones que corren como `sa-web` y `sa-worker` | esas dos service accounts |
+| | Escribir logs del build | proyecto |
+
+El agente de servicio de Cloud Build solo puede **leer** el secreto que guarda el token de la conexión con GitHub. Durante la autorización inicial necesita crear ese secreto, así que recibe permisos de administrador solo mientras dura ese paso.
+
+### Datos
+
+- **Todo expira a las 24 horas**, por TTL en Firestore, lifecycle en Storage y expiración lógica en la API.
+- **Los PDFs nunca son públicos.** Solo `sa-web` los escribe y solo `sa-worker` los lee.
+- **Los certificados son públicos a propósito** (son la vista previa del link), pero sus nombres son el `id` del roast: 22 caracteres aleatorios (128 bits), imposibles de adivinar. `allUsers` tiene `storage.legacyObjectReader` (leer un objeto por su nombre) y no `storage.objectViewer`, que además permitiría listar el bucket y descubrir todos los ids.
+
+### Entradas y modelos
+
+- **Validación estricta en `web`:**
+  - PDF de 5 MB o menos, que empiece con `%PDF`, que no esté cifrado y que tenga 5 páginas o menos;
+  - URL que calce con un perfil `linkedin.com/in/…`. La app reconstruye la URL desde el nombre de usuario, así que nunca se llama a un host que mande el usuario.
+- **El CV es dato, no instrucción.** El texto del perfil va delimitado en el prompt, con la indicación explícita de ignorar cualquier instrucción que traiga.
+- **Los campos del certificado se limpian** (sin comillas, llaves ni saltos de línea) antes de entrar al prompt de la imagen.
+- **Filtros de seguridad.** Si el modelo bloquea el roast o el certificado, el roast falla con un mensaje claro y no se reintenta.
+- **Límites que el modelo no puede romper.** La salida se recorta en código: nombre ≤ 25 caracteres, titular ≤ 8 palabras, apertura ≤ 90 palabras, 3 a 5 observaciones que citan el perfil, calificación entre 1 y 10, exactamente 3 consejos con "antes" y "después".
+- **Consentimiento.** Para roastear una URL de LinkedIn hay que confirmar que es tu perfil o que tienes permiso.
+
+### Riesgos conocidos
+
+- Cloud Armor protege el backend de web, pero no los backend buckets `site` y `cards`: ahí solo hay contenido estático y público, servido desde el CDN. El siguiente paso sería una *edge security policy* para esos dos.
+- El rate limit es por IP. Alguien con muchas IPs puede generar más roasts, y cada uno cuesta unos 8 centavos. La alerta y el dashboard existen para ver algo así a tiempo.
+
+## Costos
+
+Con precios de lista del 28 de septiembre de 2026 y consumo medido en producción:
+
+| Escenario | USD al mes |
+|---|---:|
+| Sin tráfico: solo el piso fijo (Load Balancer y Cloud Armor) | **33** |
+| 1,000 roasts | **115** |
+| 10,000 roasts | **866** |
+
+- **Un roast cuesta unos 8 centavos:** $0.034 de Nano Banana, $0.032 de Gemini (la mayoría son tokens de razonamiento) y $0.014 de Document AI.
+- Cloud Run, Firestore, Storage, Tasks, Build y Logging caben en la capa gratuita con 1,000 roasts.
+- Con 10,000 roasts, la IA es el 94 % de la factura.
+
+El detalle por servicio con fórmulas, los datos para reproducirlo en la [calculadora de precios](https://cloud.google.com/products/calculator) y cómo bajarlo a unos 3 centavos por roast están en **[docs/COSTOS.md](docs/COSTOS.md)**.
+
+## Despliegue
+
+### Desarrollo local
+
+No necesitas GCP. `LOCAL_MODE=1` cambia Firestore y Storage por archivos locales, y `MOCK_AI=1` reemplaza Document AI, Apify, Gemini y Nano Banana por respuestas fijas.
+
+```bash
+cd worker && LOCAL_MODE=1 MOCK_AI=1 LOCAL_DATA_DIR=../.localdata uv run uvicorn app.main:app --port 8081
+cd web && LOCAL_MODE=1 LOCAL_DATA_DIR=../.localdata WORKER_URL=http://localhost:8081 uv run uvicorn app.main:app --port 8080
+cd frontend && npm install && npm run dev
 ```
 
-**Flujo:** el frontend (React estático en `site`) envía el PDF o la URL a `POST /api/roasts`. **web** valida, guarda el PDF en `uploads`, crea `roasts/{id}` en Firestore con estado `queued` y encola una tarea. Cloud Tasks llama al **worker** (privado, solo tráfico interno, autenticado con OIDC). El worker extrae el texto (Document AI o Apify), lo normaliza con Gemini, escribe el roast con salida JSON estructurada, genera el certificado con Nano Banana, lo convierte a JPEG 1200×630 y lo sube a `cards`. El frontend consulta `GET /api/roasts/{id}` cada 2 s y muestra el roast en cuanto existe, antes de que termine la tarjeta. `/r/{id}` devuelve el mismo `index.html` del sitio con meta tags Open Graph, así el link compartido muestra la tarjeta como vista previa.
+Tests (los mismos que corre el pipeline):
 
-**Estados:** `queued → extracting → roasting → rendering → done | failed`. Cada paso guarda su resultado antes de avanzar: si Cloud Tasks reintenta, el worker retoma donde se quedó y no vuelve a pagar Document AI ni Gemini.
+```bash
+(cd web && uv run pytest) && (cd worker && uv run pytest) && (cd frontend && npm test)
+```
 
-## Servicios (13)
+El paso a paso completo está en la [guía de onboarding](docs/ONBOARDING.md).
 
-| # | Servicio | Uso |
-|---|----------|-----|
-| 1 | Cloud Run | `roastfolio-web` (API + `/r/{id}`) y `roastfolio-worker` (pipeline) |
-| 2 | Cloud Storage | `site` (público), `uploads` (privado, lifecycle 1 día), `cards` (público, lifecycle 1 día) |
-| 3 | Document AI | Layout Parser en `us`: PDF → texto estructurado |
-| 4 | Gemini en Vertex AI | `gemini-3.8-flash` (perfil + roast con JSON schema) y `gemini-3.1-flash-lite-image` (certificado 16:9) |
-| 5 | Cloud Tasks | Cola `roasts`: 5 en paralelo, 4 intentos con backoff |
-| 6 | Firestore | Base `roastfolio`, colección `roasts`, TTL sobre `expiresAt` |
-| 7 | Cloud Load Balancing | HTTPS global, ruteo por path, certificado administrado para `<IP>.nip.io` |
-| 8 | Cloud CDN | Caché de `site` (según `Cache-Control`) y de `cards` (máx. 1 h) |
-| 9 | Cloud Armor | OWASP (sensibilidad 1) + 5 `POST /api/roasts` por IP cada 10 min |
-| 10 | IAM | `sa-web`, `sa-worker`, `sa-tasks`, `sa-build` con permisos mínimos |
-| 11 | Cloud Build + Artifact Registry | CI/CD en push a `main` (trigger de Cloud Build conectado a GitHub), imágenes con política de limpieza |
-| 12 | Cloud Logging / Monitoring | Logs JSON, métricas basadas en logs, alerta y dashboard |
-| 13 | Secret Manager | Token de Apify, única llave del sistema; solo `sa-worker` lo lee |
+### Despliegue desde cero
 
-## Cambios respecto al spec original
+Necesitas `gcloud` autenticado con permisos de owner en el proyecto y un token de Apify. La infraestructura se puede levantar de dos maneras equivalentes:
 
-- **LinkedIn por Apify en vez de Playwright.** Desde IPs de GCP LinkedIn casi siempre responde con el authwall. El actor `harvestapi/linkedin-profile-scraper` no usa cookies y cuesta unos $4 por 1,000 perfiles. Por eso aparece Secret Manager como servicio 13. Además se pide confirmar "es mi perfil o tengo permiso".
-- **Vertex AI en `global`** para los modelos de Gemini; el resto en `us-central1`.
-- **Permisos que faltaban:** `sa-web` necesita `iam.serviceAccountUser` sobre `sa-tasks` para crear tareas con OIDC, y `sa-build` necesita `actAs` sobre `sa-web` y `sa-worker`.
-- **Expiración lógica.** El TTL de Firestore y el lifecycle de Storage borran de forma asíncrona (puede tardar hasta un día más), así que la API trata `expiresAt < ahora` como expirado.
-- **Tarjeta como JPEG 1200×630 de menos de 300 KB**, porque WhatsApp y otras redes ignoran imágenes pesadas. Se guarda como `{id}.jpg`.
-- **El WAF no revisa `POST /api/roasts`**, porque el PDF binario genera falsos positivos. Esa ruta queda protegida por la validación estricta de la app y el rate limit.
-- **Worker con ingress `internal`:** ni siquiera es alcanzable desde internet, solo desde Cloud Tasks.
+- **Scripts `gcloud`** (`infra/`): imperativos, uno por servicio y en orden. Son los que se usan en clase para ver cada pieza.
+- **Terraform** (`terraform/`): declarativo, con `plan` antes de cada cambio. Ver [terraform/README.md](terraform/README.md).
 
-## Estructura
+Con los scripts:
+
+```bash
+# 1. Proyecto y región: edita PROJECT_ID, REGION y ALERT_EMAIL en infra/env.sh
+
+# 2. El token de Apify entra directo a Secret Manager, sin pasar por ningún archivo
+printf '%s' 'apify_api_...' | gcloud secrets create apify-token --data-file=- --replication-policy=automatic
+
+# 3. Infraestructura, en orden
+for s in infra/0*.sh infra/1[0-2]*.sh; do bash "$s"; done
+
+# 4. CI/CD: imprime un link para autorizar GitHub; autoriza y vuelve a correrlo
+bash infra/13-build-trigger.sh
+bash infra/13-build-trigger.sh
+```
+
+| Script | Qué hace |
+|---|---|
+| `01-apis.sh` | Habilita las APIs |
+| `02-iam.sh` | Crea las cuatro service accounts, los roles de proyecto y los permisos `actAs` |
+| `03-storage.sh` | Crea los buckets `site`, `uploads` y `cards` con su lifecycle y permisos |
+| `04-firestore.sh` | Crea la base `roastfolio` y la política TTL |
+| `05-documentai.sh` | Crea el procesador Layout Parser |
+| `06-tasks.sh` | Crea la cola `roasts` y el permiso de encolar para `sa-web` |
+| `07-secrets.sh` | Da a `sa-worker` acceso al token de Apify |
+| `08-artifact-registry.sh` | Crea el repositorio Docker con limpieza automática |
+| `09-run.sh` | Hace el primer build y deploy de web y worker con toda su configuración de runtime, e invoker y deployer por servicio |
+| `10-lb.sh` | Configura IP, NEG, backends, CDN, URL map, certificado, proxy HTTPS y redirect |
+| `11-armor.sh` | Aplica las reglas OWASP y los rate limits |
+| `12-observability.sh` | Crea las métricas, la alerta por correo y el dashboard |
+| `13-build-trigger.sh` | Conecta GitHub y crea el trigger de Cloud Build |
+
+Todos los scripts son idempotentes: puedes correrlos otra vez sin romper nada.
+
+El certificado tarda entre 15 y 60 minutos en quedar `ACTIVE` la primera vez.
+
+### CI/CD
+
+![Pipeline de Cloud Build](docs/diagramas/cicd.png)
+
+Cada push a `main` dispara el trigger `roastfolio-main`, que corre `cloudbuild.yaml` como `sa-build`:
+
+1. Los tests de web, worker y frontend, en paralelo.
+2. El build de las imágenes, que se suben a Artifact Registry.
+3. El deploy de las nuevas revisiones en Cloud Run.
+4. La publicación del frontend en el bucket `site`.
+
+Si un test falla, no se despliega nada.
+
+El pipeline solo cambia la **imagen** de cada servicio. Las variables de entorno, la service account, el ingress y los límites viven en `infra/09-run.sh` y `terraform/run.tf`, así que un push no puede cambiar permisos ni configuración sin pasar por la revisión de infra.
+
+### Verificación rápida
+
+```bash
+B=https://34.117.137.57.nip.io
+curl -s $B/api/health                                                      # {"ok":true}
+curl -s -F intensity=medium -F consent=true -F pdf=@cv.pdf $B/api/roasts   # {"id":"..."}
+curl -s $B/api/roasts/<id>                                                 # estado y resultado
+curl -sI $B/cards/<id>.jpg | grep -i '^age'                                # a partir de la segunda vez: cache hit del CDN
+curl -s -o /dev/null -w "%{http_code}\n" https://roastfolio-web-611681112050.us-central1.run.app/api/health  # 404: solo vía LB
+curl -s -o /dev/null -w "%{http_code}\n" http://34.117.137.57.nip.io       # 301 a HTTPS
+```
+
+## Progreso del proyecto
+
+| Etapa | Estado |
+|---|---|
+| Diseño: flujo, arquitectura, modelo de datos, API, prompts | ✅ |
+| Pipeline: web, worker, máquina de estados, reintentos idempotentes | ✅ |
+| Frontend: estados en vivo, resultado, página compartible con vista previa | ✅ |
+| Borde: Load Balancer, HTTPS con nip.io, CDN y Cloud Armor | ✅ |
+| Seguridad: service accounts por componente, ingress cerrado, un solo secreto | ✅ |
+| Observabilidad: logs estructurados, métricas, alerta y dashboard | ✅ |
+| CI/CD con Cloud Build conectado a GitHub | ✅ |
+| Infraestructura como código: scripts `gcloud` y Terraform | ✅ |
+| Costos medidos en producción | ✅ |
+| Documentación: README, onboarding, costos y diagramas | ✅ |
+| Serie de artículos (uno por servicio) | en curso |
+
+### Decisiones tomadas en el camino
+
+Construir la app contra servicios reales obligó a tomar decisiones que no se ven en un diagrama.
+
+- **LinkedIn con Apify.** Desde IPs de GCP, LinkedIn casi siempre muestra su pantalla de login a los scrapers. Un actor de Apify (`harvestapi/linkedin-profile-scraper`, unos $4 por 1,000 perfiles) devuelve el perfil público sin cookies. Su token es la única llave del sistema y por eso existe Secret Manager.
+- **Gemini en el endpoint `global`.** Los modelos más nuevos salen primero ahí. Todo lo demás vive en `us-central1`, y Document AI en `us`.
+- **Permisos `actAs` explícitos.** Para crear tareas con OIDC, `sa-web` necesita `serviceAccountUser` sobre `sa-tasks`. Para desplegar revisiones que corren como `sa-web` y `sa-worker`, `sa-build` necesita lo mismo sobre ellas.
+- **Expiración lógica además del TTL.** El TTL de Firestore y el lifecycle de Storage borran de forma asíncrona. Para que las 24 horas sean de verdad, la API compara `expiresAt` con la hora actual.
+- **Certificado en JPEG de 1200×630 y menos de 300 KB.** WhatsApp y otras redes ignoran las imágenes pesadas en la vista previa. El worker recorta la imagen de Nano Banana al tamaño de Open Graph y la comprime.
+- **La subida de PDF fuera del WAF.** Las reglas OWASP marcaban bytes de PDFs reales como inyecciones. Esa ruta quedó protegida por validación de la app y el rate limit más estricto.
+- **Worker con ingress `internal`.** Cloud Tasks cuenta como tráfico interno, así que el worker no necesita ser alcanzable ni desde el Load Balancer.
+- **CI/CD 100 % en GCP.** El trigger nativo de Cloud Build, conectado a GitHub con una conexión 2nd gen, reemplazó a GitHub Actions. El pipeline completo se ve en la consola de Cloud Build.
+- **Mínimo privilegio también para el pipeline.** `sa-build` solo puede desplegar los dos servicios de Roastfolio, no cualquier servicio del proyecto. El agente de Cloud Build solo puede leer el secreto de la conexión con GitHub.
+- **Lectura pública sin listado.** Los backend buckets necesitan lectura anónima. El rol obvio, `objectViewer`, también permite listar: con la lista de `cards` cualquiera tendría todos los ids y, con ellos, todos los roasts de las últimas 24 horas. `legacyObjectReader` solo deja leer lo que ya conoces por nombre.
+- **Costos medidos, no supuestos.** La primera estimación de Gemini era de $2–5 al mes. Medido en producción son unos $32, porque los tokens de razonamiento se cobran como salida.
+
+## Estructura del repo
 
 ```
 roastfolio/
 ├── frontend/          React + Vite + Tailwind (UI en español), vitest
 ├── web/               FastAPI: POST/GET /api/roasts, GET /r/{id}; pytest
 ├── worker/            FastAPI: POST /internal/process (pipeline); pytest
-├── infra/             scripts gcloud numerados (01 → 14) + env.sh
-└── cloudbuild.yaml    tests → imágenes → Cloud Run → bucket site (trigger en push a main)
+├── infra/             scripts gcloud numerados (01 → 13) + env.sh
+├── terraform/         la misma infraestructura en Terraform, con imports del proyecto actual
+├── docs/              onboarding, costos y diagramas
+└── cloudbuild.yaml    tests → imágenes → Cloud Run → bucket site
 ```
-
-## Desarrollo local
-
-Sin GCP: `LOCAL_MODE=1` cambia Firestore y Storage por archivos en `.localdata/`, y `MOCK_AI=1` reemplaza Document AI, Apify y Gemini por respuestas fijas.
-
-```bash
-# terminal 1: worker
-cd worker && LOCAL_MODE=1 MOCK_AI=1 LOCAL_DATA_DIR=../.localdata uv run uvicorn app.main:app --port 8081
-# terminal 2: web
-cd web && LOCAL_MODE=1 LOCAL_DATA_DIR=../.localdata WORKER_URL=http://localhost:8081 uv run uvicorn app.main:app --port 8080
-# terminal 3: frontend (proxy de /api y /cards hacia :8080)
-cd frontend && npm install && npm run dev
-```
-
-Con IA real y sin mocks, quita `MOCK_AI` del worker (usa tus credenciales ADC para Vertex).
-
-Tests:
-
-```bash
-(cd web && uv run pytest) && (cd worker && uv run pytest) && (cd frontend && npm test)
-```
-
-## Despliegue desde cero
-
-Requisitos: `gcloud` autenticado con permisos de owner en el proyecto y un token de Apify.
-
-```bash
-printf '%s' 'apify_api_...' | gcloud secrets create apify-token --data-file=- --replication-policy=automatic
-for s in infra/0*.sh infra/1[0-2]*.sh; do bash "$s"; done
-bash infra/13-build-trigger.sh  # CI/CD: trigger de Cloud Build conectado a GitHub
-```
-
-**CI/CD.** Cada push a `main` dispara el trigger `roastfolio-main` de Cloud Build, que corre `cloudbuild.yaml` como `sa-build`. El trigger usa una conexión de Cloud Build a GitHub (2nd gen, `rf-github`). La primera vez, `13-build-trigger.sh` imprime un link para autorizar la GitHub App de Cloud Build e instalarla en el repo; después hay que volver a correr el script. El token de GitHub de la conexión lo guarda Cloud Build en Secret Manager. Historial y logs de cada build: consola de Cloud Build → Historial.
-
-| Script | Qué hace |
-|--------|----------|
-| `01-apis.sh` | Habilita las APIs |
-| `02-iam.sh` | Cuentas de servicio y roles a nivel proyecto |
-| `03-storage.sh` | Buckets, lifecycle y permisos por bucket |
-| `04-firestore.sh` | Base `roastfolio` + política TTL |
-| `05-documentai.sh` | Procesador Layout Parser |
-| `06-tasks.sh` | Cola `roasts` + permiso de encolar para `sa-web` |
-| `07-secrets.sh` | Acceso de `sa-worker` al token de Apify |
-| `08-artifact-registry.sh` | Repositorio Docker con limpieza automática |
-| `09-run.sh` | Primer despliegue de web y worker con toda su configuración |
-| `10-lb.sh` | IP, NEG, backends, CDN, URL map, certificado, HTTPS y redirect |
-| `11-armor.sh` | Reglas OWASP y rate limits |
-| `12-observability.sh` | Métricas, alerta por correo y dashboard |
-| `13-build-trigger.sh` | Conexión a GitHub + trigger de Cloud Build en push a `main` |
-| `14-github-actions.sh` | (Alternativa, sin uso) Workload Identity Federation para disparar Cloud Build desde GitHub Actions |
-
-Los scripts son idempotentes: se pueden correr otra vez sin romper nada. La configuración de runtime (variables, cuentas de servicio, ingress) vive en `09-run.sh`; Cloud Build solo cambia la imagen.
-
-## Verificación rápida
-
-```bash
-B=https://34.117.137.57.nip.io
-curl -s $B/api/health                                              # {"ok":true}
-curl -s -F intensity=medium -F consent=true -F pdf=@cv.pdf $B/api/roasts   # {"id": "..."}
-curl -s $B/api/roasts/<id>                                          # estado y resultado
-curl -sI $B/cards/<id>.jpg | grep -i age                            # segunda vez: cache hit del CDN
-curl -s -o /dev/null -w "%{http_code}\n" https://roastfolio-web-611681112050.us-central1.run.app/api/health  # 404: solo vía LB
-```
-
-## Costos estimados (1,000 roasts al mes)
-
-| Concepto | USD/mes aprox. |
-|----------|---------------:|
-| Load Balancer (regla de forwarding) | 18 |
-| Cloud Armor (política + 10 reglas + requests) | 15 |
-| Nano Banana 2 Lite (1 imagen por roast, $0.034) | 34 |
-| Document AI Layout Parser ($10 por 1,000 páginas, ~2 por CV) | 10–20 |
-| Gemini 3.8 Flash (2 llamadas por roast) | 2–5 |
-| Apify (solo roasts por URL, $4 por 1,000) | ≤ 4 |
-| Cloud Run, Firestore, Storage, Tasks, Build, Logging | ~0 (capa gratuita) |
-| **Total** | **~85–95** |
-
-Los fijos dominan con poco tráfico. Cifras a validar con la [calculadora de precios](https://cloud.google.com/products/calculator).

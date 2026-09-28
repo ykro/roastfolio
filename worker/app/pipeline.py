@@ -37,19 +37,19 @@ def run(roast_id: str, store: Store, s: Settings, attempt: int = 0) -> None:
 
 
 def _run_steps(roast_id: str, doc: dict, store: Store, s: Settings) -> None:
-    profile = doc.get("profile")
-    if not profile:
+    text = doc.get("profileText")
+    if not text:
         store.update(roast_id, status="extracting")
         with step(roast_id, "extracting"):
             text = extract.extract_text(doc, store.read_upload, s)
-            profile = ai.normalize_profile(text, s)
-        store.update(roast_id, profile=profile)
+        store.update(roast_id, profileText=text)
 
     result = doc.get("result")
     if not result:
         store.update(roast_id, status="roasting")
         with step(roast_id, "roasting"):
-            result = ai.roast(profile, doc["intensity"], s)
+            # Gemini reads the raw CV/LinkedIn text directly: a separate "normalize" call cost ~20 s.
+            result = ai.roast(text, doc["intensity"], s)
     # Saving result together with `rendering` lets the UI show the roast while the card renders.
     store.update(roast_id, result=result, status="rendering")
 

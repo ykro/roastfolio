@@ -74,7 +74,7 @@ steps:
         set -e
         gcloud storage cp -r frontend/dist/assets gs://${_SITE_BUCKET}/ \
           --cache-control="public, max-age=31536000, immutable"
-        gcloud storage cp frontend/dist/favicon.svg gs://${_SITE_BUCKET}/favicon.svg \
+        gcloud storage cp frontend/dist/favicon.svg frontend/dist/muestra.jpg gs://${_SITE_BUCKET}/ \
           --cache-control="public, max-age=86400"
         gcloud storage cp frontend/dist/index.html gs://${_SITE_BUCKET}/index.html \
           --cache-control="no-cache"

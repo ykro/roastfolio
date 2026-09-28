@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="estados-title estados-desc">
       <title id="estados-title">Roastfolio: estados de un roast</title>
-      <desc id="estados-desc">Ciclo de vida de un roast: avanza de queued a extracting, roasting, rendering y done; un error reintentable pasa a un reintento de Cloud Tasks que retoma desde el último paso guardado sin volver a pagar, un error permanente o el cuarto intento fallido termina en failed, y a las 24 horas cualquier roast expira y la API responde 404.</desc>
+      <desc id="estados-desc">Ciclo de vida de un roast: avanza de queued a extracting, roasting, rendering y done; un error reintentable al extraer o escribir el roast pasa a un reintento de Cloud Tasks que retoma desde el último paso guardado sin volver a pagar, el certificado se intenta dos veces y si falla se usa uno genérico, un error permanente o el cuarto intento fallido termina en failed, y a las 24 horas cualquier roast expira y la API responde 404.</desc>
       <defs>
-        <style>@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&amp;family=Courier+Prime:wght@400;700&amp;display=swap');</style>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&amp;family=Courier+Prime:wght@400;700&amp;display=swap');</style>
         <marker id="estados-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
           <polygon points="0 0, 8 3, 0 6" fill="#4c5a8f"/>
         </marker>
@@ -25,10 +25,8 @@
 
       <!-- GROUP BRACKETS over / under extracting · roasting · rendering -->
       <g fill="none" stroke="#a9c2b4" stroke-width="1">
-        <path d="M296 232 V212 H664 V232"/>
-        <path d="M480 212 V232"/>
-        <path d="M296 304 V324 H664 V304"/>
-        <path d="M480 304 V324"/>
+        <path d="M296 232 V212 H504 V232"/>
+        <path d="M296 304 V324 H480 V304"/>
       </g>
 
       <!-- TRANSITIONS (drawn before states) -->
@@ -53,15 +51,15 @@
         <rect x="184" y="250" width="40" height="12" rx="2" fill="#f7faf7"/>
         <text x="204" y="259" text-anchor="middle">entrega</text>
         <rect x="366" y="250" width="44" height="12" rx="2" fill="#f7faf7"/>
-        <text x="388" y="259" text-anchor="middle">+profile</text>
+        <text x="388" y="259" text-anchor="middle">+texto</text>
         <rect x="552" y="250" width="40" height="12" rx="2" fill="#f7faf7"/>
         <text x="572" y="259" text-anchor="middle">+result</text>
         <rect x="734" y="250" width="44" height="12" rx="2" fill="#f7faf7"/>
         <text x="756" y="259" text-anchor="middle">+tarjeta</text>
 
-        <rect x="350" y="170" width="100" height="24" rx="2" fill="#f7faf7"/>
-        <text x="446" y="179" text-anchor="end">error reintentable</text>
-        <text x="446" y="190" text-anchor="end">worker responde 500</text>
+        <rect x="300" y="170" width="150" height="24" rx="2" fill="#f7faf7"/>
+        <text x="446" y="179" text-anchor="end">error reintentable al leer</text>
+        <text x="446" y="190" text-anchor="end">o escribir: worker responde 500</text>
 
         <rect x="510" y="176" width="136" height="24" rx="2" fill="#f7faf7"/>
         <text x="514" y="185" fill="#c4232b" font-weight="700">retoma del último paso</text>
@@ -90,19 +88,19 @@
           <rect x="232" y="232" width="128" height="72" rx="8" fill="#ffffff" stroke="#22306b"/>
           <text x="296" y="258" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif">extracting</text>
           <text x="296" y="275" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">Document AI / Apify</text>
-          <text x="296" y="287" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">Gemini normaliza</text>
+          <text x="296" y="287" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">texto tipo CV</text>
         </g>
         <g>
           <rect x="416" y="232" width="128" height="72" rx="8" fill="#ffffff" stroke="#22306b"/>
           <text x="480" y="258" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif">roasting</text>
           <text x="480" y="275" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">Gemini, JSON schema</text>
-          <text x="480" y="287" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">roast, score, tips</text>
+          <text x="480" y="287" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">citas, score, tips</text>
         </g>
         <g>
           <rect x="600" y="232" width="128" height="72" rx="8" fill="#ffffff" stroke="#22306b"/>
           <text x="664" y="258" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif">rendering</text>
           <text x="664" y="275" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">Nano Banana</text>
-          <text x="664" y="287" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">JPEG 1200×630</text>
+          <text x="664" y="287" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">2 intentos o genérico</text>
         </g>
         <g>
           <rect x="784" y="232" width="128" height="72" rx="8" fill="#c4232b" fill-opacity="0.07" stroke="#c4232b"/>
@@ -154,7 +152,7 @@
         <rect x="248" y="570" width="16" height="12" rx="3" fill="#22306b" fill-opacity="0.04" stroke="#4c5a8f" stroke-width="1.5" stroke-dasharray="2,2"/>
         <text x="270" y="580">terminal</text>
         <path d="M344 570 V576 H388 V570" fill="none" stroke="#a9c2b4" stroke-width="1"/>
-        <text x="396" y="580">cualquiera de los tres pasos</text>
+        <text x="396" y="580">pasos que cubre la flecha</text>
         <line x1="552" y1="576" x2="580" y2="576" stroke="#c4232b" stroke-width="1.4" marker-end="url(#estados-arrow-accent)"/>
         <text x="588" y="580">foco: retomar sin repetir</text>
         <line x1="728" y1="576" x2="756" y2="576" stroke="#4c5a8f" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#estados-arrow)"/>

@@ -21,7 +21,7 @@ La misma infraestructura que levantan los scripts `infra/NN-*.sh`, escrita como 
 | `build.tf` | Conexión a GitHub (2nd gen), repositorio, trigger `roastfolio-main` y permisos del agente de Cloud Build |
 | `import.tf` | Bloques `import {}` que apuntan a los recursos vivos |
 
-En total son 73 recursos.
+En total son 74 recursos.
 
 ## Requisitos
 
@@ -44,7 +44,7 @@ terraform plan
 El plan debe decir:
 
 ```
-Plan: 73 to import, 0 to add, 1 to change, 0 to destroy.
+Plan: 74 to import, 0 to add, 1 to change, 0 to destroy.
 ```
 
 El único cambio es de forma y no afecta nada: la política de limpieza `delete-old` de Artifact Registry tiene `tagState = TAG_STATE_UNSPECIFIED` porque la creó gcloud, y el provider solo acepta `ANY`, que significa lo mismo. Si ves algo `to destroy` o `must be replaced`, **no apliques**: alguien cambió el recurso a mano y hay que alinear el código primero.

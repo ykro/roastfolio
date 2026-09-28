@@ -49,7 +49,8 @@ ROAST_SCHEMA = {
         },
         "scene": {
             "type": "STRING",
-            "description": "In English: a visual gag that sums up the roast, objects or animals only, no people, max 30 words",
+            "description": "In English: a visual gag that sums up the roast, generic objects or animals only, "
+                           "no people, no brand or product names, max 30 words",
         },
     },
     "required": ["name", "headline", "roast", "burns", "closer", "score", "tips", "scene"],
@@ -100,8 +101,9 @@ FORMATO
   fechas ni logros: solo usa números que aparezcan en el perfil; donde falte uno, pon un marcador entre corchetes
   como "[N] estudiantes" o "[X%]" para que la persona lo llene. Si el consejo es borrar algo, "after" dice qué
   queda en su lugar (por ejemplo la lista ya depurada). Nada genérico tipo "agrega logros".
-- "scene": en inglés, una escena visual que resuma el chiste principal, solo con objetos o animales (sin personas),
-  para ilustrar el certificado. Ejemplo: "a tower of framed certificates wobbling on a tiny desk".
+- "scene": en inglés, una escena visual que resuma el chiste principal, solo con objetos genéricos o animales
+  (sin personas ni lugares que las impliquen como podios o auditorios; sin marcas, productos ni logos:
+  "a smartphone", nunca "an Android phone"), para ilustrar el certificado. Ejemplo: "a tower of framed certificates wobbling on a tiny desk".
 - "name": el nombre tal como aparece, máximo 25 caracteres.
 
 {tone}"""
@@ -124,7 +126,9 @@ Style: {style}
 Rules:
 - Render every text exactly as written above, in Spanish, correctly spelled and accented. No other words anywhere.
 - Stamps, stains, burns and the seal never cover any of the text.
-- No people or faces (the illustration uses objects or animals only), no real company logos.
+- The illustration has no human figures at all: no people, faces, hands, crowds or silhouettes, not even tiny ones.
+  Objects or animals only.
+- No brand names, product names or company logos anywhere, including inside the illustration.
 - Crisp, high contrast, legible when shrunk to a social media preview."""
 
 CARD_STYLES = {

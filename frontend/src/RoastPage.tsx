@@ -103,7 +103,7 @@ function Verdict({ roast, result, onNew }: { roast: Roast; result: RoastResult; 
           Dictamen para <span className="text-ink">{result.name}</span>, intensidad {INTENSITY_LABEL[roast.intensity].toLowerCase()}
         </p>
         <h1 className="display mt-3 pr-28 text-[clamp(2.5rem,8vw,4.75rem)] sm:pr-40">{result.headline}</h1>
-        <div className="absolute right-0 bottom-4 sm:bottom-6" aria-label={`Calificación: ${result.score} de 10`}>
+        <div className="absolute right-3 bottom-4 sm:bottom-6" aria-label={`Calificación: ${result.score} de 10`}>
           <Stamp animate tilt={-12} className="px-3 text-center text-[clamp(2.25rem,7vw,3.75rem)] leading-none">
             {result.score}/10
           </Stamp>

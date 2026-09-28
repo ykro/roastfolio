@@ -1,0 +1,83 @@
+# CI/CD for Roastfolio. Runs on every push to main (trigger in infra/13-build-trigger.sh)
+# or by hand: gcloud builds submit --config cloudbuild.yaml --region us-central1 \
+#   --service-account projects/PROJECT/serviceAccounts/sa-build@PROJECT.iam.gserviceaccount.com
+#
+# Runtime config (env vars, service accounts, ingress) is owned by infra/09-run.sh;
+# this pipeline only ships new code: images, revisions and the static site.
+
+substitutions:
+  _REGION: us-central1
+  _AR: us-central1-docker.pkg.dev/${PROJECT_ID}/roastfolio
+  _SITE_BUCKET: ${PROJECT_ID}-roastfolio-site
+options:
+  logging: CLOUD_LOGGING_ONLY
+  dynamicSubstitutions: true
+
+steps:
+  # 1. Tests (the three suites run in parallel)
+  - id: test-web
+    name: ghcr.io/astral-sh/uv:0.8.22-python3.12-bookworm-slim
+    dir: web
+    entrypoint: bash
+    args: ["-c", "uv sync --frozen && uv run pytest -q"]
+    waitFor: ["-"]
+  - id: test-worker
+    name: ghcr.io/astral-sh/uv:0.8.22-python3.12-bookworm-slim
+    dir: worker
+    entrypoint: bash
+    args: ["-c", "uv sync --frozen && uv run pytest -q"]
+    waitFor: ["-"]
+  - id: test-frontend
+    name: node:24-slim
+    dir: frontend
+    entrypoint: bash
+    args: ["-c", "npm ci && npm test && npm run build"]
+    waitFor: ["-"]
+
+  # 2. Images -> Artifact Registry
+  - id: build-web
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_AR}/web:${BUILD_ID}", "-t", "${_AR}/web:latest", "web"]
+    waitFor: ["test-web"]
+  - id: build-worker
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_AR}/worker:${BUILD_ID}", "-t", "${_AR}/worker:latest", "worker"]
+    waitFor: ["test-worker"]
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "--all-tags", "${_AR}/web"]
+    waitFor: ["build-web", "build-worker", "test-frontend"]
+  - id: push-worker
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "--all-tags", "${_AR}/worker"]
+    waitFor: ["build-worker", "test-web", "test-frontend"]
+
+  # 3. Deploy new revisions (image only; everything else stays as configured)
+  - id: deploy-worker
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args: ["run", "deploy", "roastfolio-worker", "--image", "${_AR}/worker:${BUILD_ID}", "--region", "${_REGION}", "--quiet"]
+    waitFor: ["push-worker"]
+  - id: deploy-web
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args: ["run", "deploy", "roastfolio-web", "--image", "${_AR}/web:${BUILD_ID}", "--region", "${_REGION}", "--quiet"]
+    waitFor: ["push"]
+
+  # 4. Static site -> bucket. Hashed assets are immutable; index.html must always revalidate.
+  - id: publish-site
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        gcloud storage cp -r frontend/dist/assets gs://${_SITE_BUCKET}/ \
+          --cache-control="public, max-age=31536000, immutable"
+        gcloud storage cp frontend/dist/favicon.svg gs://${_SITE_BUCKET}/favicon.svg \
+          --cache-control="public, max-age=86400"
+        gcloud storage cp frontend/dist/index.html gs://${_SITE_BUCKET}/index.html \
+          --cache-control="no-cache"
+    waitFor: ["deploy-web"]
+
+timeout: 1200s

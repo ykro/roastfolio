@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/* Ventanilla de trámites: form paper, carbon-copy ink, rubber-stamp red. */
+@theme {
+  --color-paper: #e9f0eb;
+  --color-sheet: #f7faf7;
+  --color-rule: #a9c2b4;
+  --color-ink: #22306b;
+  --color-ink-soft: #4c5a8f;
+  --color-stamp: #c4232b;
+  --color-manila: #e6c878;
+
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-type: "Courier Prime", ui-monospace, monospace;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--color-paper);
+}
+
+/* Condensed, heavy headings: the voice of an official form. */
+.display {
+  font-family: var(--font-sans);
+  font-stretch: 68%;
+  font-weight: 850;
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+}
+
+/* Ruled form lines behind filled-in answers. */
+.ruled {
+  background-image: linear-gradient(to bottom, transparent calc(100% - 1px), var(--color-rule) 0);
+  background-size: 100% 2rem;
+  line-height: 2rem;
+}
+
+.stamp {
+  font-family: var(--font-sans);
+  font-stretch: 75%;
+  font-weight: 900;
+  color: var(--color-stamp);
+  border: 3px solid currentColor;
+  border-radius: 6px;
+  padding: 0.15em 0.5em;
+  display: inline-block;
+  /* Uneven ink, like a real rubber stamp. */
+  mask-image: radial-gradient(circle at 30% 40%, #000 55%, rgb(0 0 0 / 0.8) 70%, #000 85%);
+}
+
+@keyframes stamp-in {
+  0% { opacity: 0; transform: scale(1.8) rotate(var(--tilt, -8deg)); }
+  60% { opacity: 1; transform: scale(0.94) rotate(var(--tilt, -8deg)); }
+  100% { opacity: 1; transform: scale(1) rotate(var(--tilt, -8deg)); }
+}
+
+.stamp-in {
+  animation: stamp-in 380ms cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
+}
+
+@keyframes typing {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+.typing span {
+  animation: typing 1.2s infinite;
+}
+.typing span:nth-child(2) { animation-delay: 0.2s; }
+.typing span:nth-child(3) { animation-delay: 0.4s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp-in, .typing span { animation: none; }
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-stamp);
+  outline-offset: 3px;
+}

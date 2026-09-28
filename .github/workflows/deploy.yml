@@ -38,7 +38,7 @@ jobs:
         run: |
           BUILD_ID=$(gcloud builds submit . --config cloudbuild.yaml --region "$REGION" \
             --project "$PROJECT_ID" --service-account "projects/$PROJECT_ID/serviceAccounts/$SA_BUILD" \
-            --async --format='value(id)')
+            --gcs-source-staging-dir "gs://$PROJECT_ID-roastfolio-build/source" --async --format='value(id)')
           echo "Build: https://console.cloud.google.com/cloud-build/builds;region=$REGION/$BUILD_ID?project=$PROJECT_ID"
           while true; do
             STATUS=$(gcloud builds describe "$BUILD_ID" --region "$REGION" --project "$PROJECT_ID" --format='value(status)')

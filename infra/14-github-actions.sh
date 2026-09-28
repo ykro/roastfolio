@@ -32,13 +32,19 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" --condition=None --quiet \
   --member="serviceAccount:$SA_BUILD" --role=roles/cloudbuild.builds.editor >/dev/null
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --condition=None --quiet \
   --member="serviceAccount:$SA_BUILD" --role=roles/serviceusage.serviceUsageConsumer >/dev/null
-gcloud storage buckets add-iam-policy-binding "gs://${PROJECT_ID}_cloudbuild" \
-  --member="serviceAccount:$SA_BUILD" --role=roles/storage.objectAdmin >/dev/null
-# gcloud builds submit also reads the bucket's metadata before uploading.
-gcloud storage buckets add-iam-policy-binding "gs://${PROJECT_ID}_cloudbuild" \
-  --member="serviceAccount:$SA_BUILD" --role=roles/storage.legacyBucketReader >/dev/null
+# Dedicated staging bucket for the source tarball. The default <project>_cloudbuild bucket
+# would require storage.buckets.list on the whole project (gcloud checks who owns it).
+STAGING="gs://${PROJECT_ID}-${APP}-build"
+exists gcloud storage buckets describe "$STAGING" ||
+  gcloud storage buckets create "$STAGING" --location="$REGION" --uniform-bucket-level-access \
+    --public-access-prevention
+echo '{"rule": [{"action": {"type": "Delete"}, "condition": {"age": 1}}]}' > "$GEN_DIR/lifecycle-build.json"
+gcloud storage buckets update "$STAGING" --lifecycle-file="$GEN_DIR/lifecycle-build.json" >/dev/null
+gcloud storage buckets add-iam-policy-binding "$STAGING" \
+  --member="serviceAccount:$SA_BUILD" --role=roles/storage.admin >/dev/null
 gcloud iam service-accounts add-iam-policy-binding "$SA_BUILD" --role=roles/iam.serviceAccountUser \
   --member="serviceAccount:$SA_BUILD" --quiet >/dev/null
 
 echo "  provider: ${POOL_ID}/providers/${PROVIDER}"
 echo "  service account: $SA_BUILD"
+echo "  staging: $STAGING/source"

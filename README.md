@@ -44,7 +44,7 @@ flowchart LR
 | 8 | Cloud CDN | Caché de `site` (según `Cache-Control`) y de `cards` (máx. 1 h) |
 | 9 | Cloud Armor | OWASP (sensibilidad 1) + 5 `POST /api/roasts` por IP cada 10 min |
 | 10 | IAM | `sa-web`, `sa-worker`, `sa-tasks`, `sa-build` con permisos mínimos |
-| 11 | Cloud Build + Artifact Registry | CI/CD en push a `main`, imágenes con política de limpieza |
+| 11 | Cloud Build + Artifact Registry | CI/CD en push a `main` (GitHub Actions → Cloud Build vía Workload Identity Federation, sin llaves), imágenes con política de limpieza |
 | 12 | Cloud Logging / Monitoring | Logs JSON, métricas basadas en logs, alerta y dashboard |
 | 13 | Secret Manager | Token de Apify, única llave del sistema; solo `sa-worker` lo lee |
 
@@ -65,7 +65,8 @@ roastfolio/
 ├── frontend/          React + Vite + Tailwind (UI en español), vitest
 ├── web/               FastAPI: POST/GET /api/roasts, GET /r/{id}; pytest
 ├── worker/            FastAPI: POST /internal/process (pipeline); pytest
-├── infra/             scripts gcloud numerados (01 → 13) + env.sh
+├── infra/             scripts gcloud numerados (01 → 14) + env.sh
+├── .github/workflows/ deploy.yml: push a main → Cloud Build
 └── cloudbuild.yaml    tests → imágenes → Cloud Run → bucket site
 ```
 
@@ -97,8 +98,10 @@ Requisitos: `gcloud` autenticado con permisos de owner en el proyecto y un token
 ```bash
 printf '%s' 'apify_api_...' | gcloud secrets create apify-token --data-file=- --replication-policy=automatic
 for s in infra/0*.sh infra/1[0-2]*.sh; do bash "$s"; done
-bash infra/13-build-trigger.sh   # imprime un link para autorizar GitHub; vuelve a correrlo después
+bash infra/14-github-actions.sh  # CI/CD: GitHub Actions -> Cloud Build con Workload Identity Federation
 ```
+
+**CI/CD.** Cada push a `main` ejecuta `.github/workflows/deploy.yml`. GitHub entrega un token OIDC que Workload Identity Federation cambia por credenciales temporales de `sa-build`, solo para `ykro/roastfolio` en `refs/heads/main`. No hay llaves JSON. El workflow lanza `cloudbuild.yaml` en Cloud Build y espera el resultado. `13-build-trigger.sh` es la alternativa nativa: un trigger de Cloud Build conectado a GitHub, que requiere autorizar la GitHub App de Cloud Build en el navegador.
 
 | Script | Qué hace |
 |--------|----------|
@@ -114,7 +117,8 @@ bash infra/13-build-trigger.sh   # imprime un link para autorizar GitHub; vuelve
 | `10-lb.sh` | IP, NEG, backends, CDN, URL map, certificado, HTTPS y redirect |
 | `11-armor.sh` | Reglas OWASP y rate limits |
 | `12-observability.sh` | Métricas, alerta por correo y dashboard |
-| `13-build-trigger.sh` | Conexión con GitHub y trigger en push a `main` |
+| `13-build-trigger.sh` | (Alternativa) trigger nativo de Cloud Build; requiere autorizar GitHub en el navegador |
+| `14-github-actions.sh` | Workload Identity Federation + bucket de staging para el workflow de GitHub Actions |
 
 Los scripts son idempotentes: se pueden correr otra vez sin romper nada. La configuración de runtime (variables, cuentas de servicio, ingress) vive en `09-run.sh`; Cloud Build solo cambia la imagen.
 

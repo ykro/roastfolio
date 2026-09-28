@@ -176,7 +176,7 @@ El agente de servicio de Cloud Build solo puede **leer** el secreto que guarda e
 ### Riesgos conocidos
 
 - Cloud Armor protege el backend de web, pero no los backend buckets `site` y `cards`: ahí solo hay contenido estático y público, servido desde el CDN. El siguiente paso sería una *edge security policy* para esos dos.
-- El rate limit es por IP. Alguien con muchas IPs puede generar más roasts, y cada uno cuesta unos 6 centavos. Por eso web tiene además un **tope diario de 450 roasts** (`DAILY_ROAST_LIMIT`, hora de Guatemala): unos $28 de IA más el costo fijo, cerca de $30 al día. Un contador en Firestore, dentro de una transacción, rechaza con 429 lo que pase de ahí. Un presupuesto de Cloud Billing de $900 al mes avisa por correo al 50, 90 y 100 % (`infra/14-budget.sh`); el presupuesto solo alerta, el tope es el que detiene el gasto.
+- El rate limit es por IP. Alguien con muchas IPs puede generar más roasts, y cada uno cuesta unos 6 centavos. Por eso web tiene además un tope de 450 roasts diarios, cerca de $30 al día; ver [Límites de gasto](#límites-de-gasto).
 
 ## Costos
 
@@ -194,6 +194,30 @@ Con precios de lista del 28 de septiembre de 2026 y consumo medido:
 - **Un roast cuesta $0.062:** $0.034 del certificado (Nano Banana), $0.014 de Document AI, $0.012 de Gemini y el resto entre Apify e infraestructura.
 - **El 97 % del costo variable es IA pagada por uso.** El fijo son el Load Balancer y Cloud Armor, que cobran por hora.
 - Si Vertex AI no puede generar el certificado, el usuario recibe uno genérico y ese roast cuesta $0.034 menos.
+
+### Límites de gasto
+
+Casi todo el costo es IA pagada por roast, así que el gasto se controla limitando cuántos roasts entran. Hay cinco capas, de la más fina a la más gruesa:
+
+| Capa | Límite | Qué pasa al llegar | Dónde se configura |
+|---|---|---|---|
+| Cloud Armor | 5 roasts por IP cada 10 minutos (y 300 requests por IP por minuto para todo lo demás) | 429: «Llegaste al límite de 5 roasts cada 10 minutos» | `infra/11-armor.sh`, `terraform/armor.tf` |
+| Tope diario en web | **450 roasts por día**, hora de Guatemala | 429: «Roastfolio llegó a su límite de roasts por hoy. Vuelve mañana.» | `DAILY_ROAST_LIMIT` en web (450 por defecto) |
+| Cloud Tasks | 5 roasts simultáneos, 2 por segundo | Los demás esperan en la cola; no se rechaza ninguno | `infra/06-tasks.sh`, `terraform/tasks.tf` |
+| Cloud Run (worker) | 5 instancias × 4 tareas = 20 en paralelo | Igual que la cola: esperan | `infra/09-run.sh`, `terraform/run.tf` |
+| Presupuesto de Cloud Billing | $900 al mes para todo el proyecto | Correo al 50, 90 y 100 % del gasto real y al 100 % del pronóstico. **No detiene nada** | `infra/14-budget.sh` |
+
+**El que detiene el gasto es el tope diario.** 450 roasts × $0.062 son unos $28 de IA, más ~$1.10 diarios del costo fijo: **cerca de $30 al día y $870 al mes en el peor caso**. Por eso el presupuesto es de $900: si el tope se alcanza todos los días, llegan las alertas del 50 y 90 %, y la del 100 % solo si algo más del proyecto está gastando. Sin el tope, el techo lo pondría el worker: hasta 2,880 roasts por hora, unos $180 por hora.
+
+Cómo funciona el tope: antes de guardar el PDF o encolar, web incrementa un contador en Firestore (`limits/{AAAA-MM-DD}`) dentro de una transacción, así que dos requests simultáneos no pueden pasarse del límite. Una entrada inválida no gasta cupo, porque se valida antes. Cada rechazo deja un log con `jsonPayload.event="daily_limit"`.
+
+Para cambiar el tope:
+
+```bash
+gcloud run services update roastfolio-web --region=us-central1 --update-env-vars=DAILY_ROAST_LIMIT=300
+```
+
+Agrega también la variable a `infra/09-run.sh` y `terraform/run.tf`; si no, el siguiente cambio de infraestructura la regresa a 450.
 
 La vista para finanzas (estructura de costos, margen, techo de gasto ante abuso), el detalle por servicio con fórmulas, los datos para la [calculadora de precios](https://cloud.google.com/products/calculator) y cómo bajarlo a 3 centavos por roast están en **[docs/COSTOS.md](docs/COSTOS.md)**.
 

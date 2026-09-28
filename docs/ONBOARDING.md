@@ -36,7 +36,8 @@ roastfolio/
 │       ├── pipeline.py    máquina de estados y reintentos
 │       ├── extract.py     Document AI (PDF) y Apify (LinkedIn)
 │       ├── ai.py          prompts y llamadas a Gemini y Nano Banana
-│       ├── card.py        convierte el certificado a JPEG 1200×630
+│       ├── card.py        convierte el certificado a JPEG 1200×630 y sirve el genérico de respaldo
+│       ├── assets/        certificados genéricos por intensidad (respaldo si Nano Banana falla)
 │       └── log.py         logs JSON (las métricas dependen de ellos)
 ├── infra/             scripts gcloud numerados, idempotentes
 ├── terraform/         la misma infraestructura, declarativa
@@ -171,7 +172,7 @@ En Cloud Monitoring hay un dashboard llamado **Roastfolio** con roasts por hora,
 | `429` al crear roasts | Cloud Armor: más de 5 `POST /api/roasts` por IP en 10 minutos. Es a propósito |
 | El `*.run.app` de web responde 404 | Correcto: web solo acepta tráfico que llega por el Load Balancer |
 | Un certificado viejo sigue apareciendo tras borrarse | El CDN lo guarda hasta 1 hora. La API ya lo trata como expirado |
-| Roast en `rendering` por varios minutos | Nano Banana está lento o fallando. Revisa los logs del paso `rendering`; Cloud Tasks reintentará |
+| Roast con el certificado genérico | Nano Banana falló 2 veces (casi siempre cuota 429 de Vertex AI). Busca `jsonPayload.event="card_fallback"` en los logs del worker; la métrica `roastfolio_cards_generic` los cuenta |
 
 ## 8. Convenciones
 

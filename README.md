@@ -67,7 +67,7 @@ El puerto 80 solo redirige a HTTPS. El dominio es `<IP>.nip.io`: un DNS comodín
 3. **`worker`** hace el trabajo pesado:
    - extrae el texto con Document AI (PDF) o con Apify (LinkedIn);
    - escribe el roast con `gemini-3.8-flash` y un JSON schema fijo;
-   - genera el certificado con Nano Banana (`gemini-3.1-flash-lite-image`) y lo convierte a JPEG de 1200×630 y menos de 300 KB;
+   - genera el certificado con Nano Banana (`gemini-3.1-flash-lite-image`) y lo convierte a JPEG de 1200×630 y menos de 300 KB. Lo intenta 2 veces; si Vertex AI sigue fallando (cuota, error o filtro de seguridad), usa el certificado genérico de esa intensidad (`worker/app/assets/fallback-*.jpg`) y marca el roast con `cardGeneric`. El roast nunca falla por la imagen;
    - lo sube a `cards`.
 4. **El navegador** consulta `GET /api/roasts/{id}` cada 2 segundos y muestra cada avance.
 5. **`/r/{id}`** devuelve el `index.html` del sitio con meta tags Open Graph que apuntan al certificado. Por eso el link compartido tiene vista previa.
@@ -176,23 +176,26 @@ El agente de servicio de Cloud Build solo puede **leer** el secreto que guarda e
 ### Riesgos conocidos
 
 - Cloud Armor protege el backend de web, pero no los backend buckets `site` y `cards`: ahí solo hay contenido estático y público, servido desde el CDN. El siguiente paso sería una *edge security policy* para esos dos.
-- El rate limit es por IP. Alguien con muchas IPs puede generar más roasts, y cada uno cuesta unos 8 centavos. La alerta y el dashboard existen para ver algo así a tiempo.
+- El rate limit es por IP. Alguien con muchas IPs puede generar más roasts, y cada uno cuesta unos 6 centavos. El máximo de instancias del worker pone un techo de unos $180 por hora. La alerta y el dashboard existen para ver algo así a tiempo.
 
 ## Costos
 
-Con precios de lista del 28 de septiembre de 2026 y consumo medido en producción:
+Con precios de lista del 28 de septiembre de 2026 y consumo medido:
 
-| Escenario | USD al mes |
-|---|---:|
-| Sin tráfico: solo el piso fijo (Load Balancer y Cloud Armor) | **33** |
-| 1,000 roasts | **115** |
-| 10,000 roasts | **866** |
+**Tener Roastfolio en línea cuesta $33 al mes aunque nadie entre, y cada roast suma unos 6 centavos.** Una persona hace en promedio 1.5 roasts, así que cada usuario cuesta unos 9 centavos.
 
-- **Un roast cuesta unos 8 centavos:** $0.034 de Nano Banana, $0.032 de Gemini (la mayoría son tokens de razonamiento) y $0.014 de Document AI.
-- Cloud Run, Firestore, Storage, Tasks, Build y Logging caben en la capa gratuita con 1,000 roasts.
-- Con 10,000 roasts, la IA es el 94 % de la factura.
+| Usuarios al mes | Factura mensual | Costo por usuario |
+|---:|---:|---:|
+| 0 | **$33** | — |
+| 100 | **$43** | $0.43 |
+| 1,000 | **$127** | $0.13 |
+| 10,000 | **$969** | $0.097 |
 
-El detalle por servicio con fórmulas, los datos para reproducirlo en la [calculadora de precios](https://cloud.google.com/products/calculator) y cómo bajarlo a unos 3 centavos por roast están en **[docs/COSTOS.md](docs/COSTOS.md)**.
+- **Un roast cuesta $0.062:** $0.034 del certificado (Nano Banana), $0.014 de Document AI, $0.012 de Gemini y el resto entre Apify e infraestructura.
+- **El 97 % del costo variable es IA pagada por uso.** El fijo son el Load Balancer y Cloud Armor, que cobran por hora.
+- Si Vertex AI no puede generar el certificado, el usuario recibe uno genérico y ese roast cuesta $0.034 menos.
+
+La vista para finanzas (estructura de costos, margen, techo de gasto ante abuso), el detalle por servicio con fórmulas, los datos para la [calculadora de precios](https://cloud.google.com/products/calculator) y cómo bajarlo a 3 centavos por roast están en **[docs/COSTOS.md](docs/COSTOS.md)**.
 
 ## Despliegue
 
@@ -314,7 +317,7 @@ Construir la app contra servicios reales obligó a tomar decisiones que no se ve
 - **CI/CD 100 % en GCP.** El trigger nativo de Cloud Build, conectado a GitHub con una conexión 2nd gen, reemplazó a GitHub Actions. El pipeline completo se ve en la consola de Cloud Build.
 - **Mínimo privilegio también para el pipeline.** `sa-build` solo puede desplegar los dos servicios de Roastfolio, no cualquier servicio del proyecto. El agente de Cloud Build solo puede leer el secreto de la conexión con GitHub.
 - **Lectura pública sin listado.** Los backend buckets necesitan lectura anónima. El rol obvio, `objectViewer`, también permite listar: con la lista de `cards` cualquiera tendría todos los ids y, con ellos, todos los roasts de las últimas 24 horas. `legacyObjectReader` solo deja leer lo que ya conoces por nombre.
-- **Costos medidos, no supuestos.** La primera estimación de Gemini era de $2–5 al mes. Medido en producción son unos $32, porque los tokens de razonamiento se cobran como salida.
+- **Costos medidos, no supuestos.** La primera estimación de Gemini era de $2–5 al mes por 1,000 roasts. Medido en producción eran unos $32, porque los tokens de razonamiento se cobran como salida. Con una sola llamada y razonamiento bajo quedó en $12.
 
 ## Estructura del repo
 

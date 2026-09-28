@@ -127,7 +127,7 @@ def seed(store, rid="r" * 22, **kw):
     now = datetime.now(timezone.utc)
     store.docs[rid] = {"status": "done", "source": "url", "sourceRef": "x", "intensity": "soft",
                        "result": {"name": "Ana <b>", "headline": "Sinergia sin evidencia", "roast": "...",
-                                  "score": 4, "tips": ["a", "b", "c"]},
+                                  "score": 4, "tips": []},
                        "cardPath": f"{rid}.jpg", "error": None, "createdAt": now,
                        "expiresAt": now + timedelta(hours=1), **kw}
     return rid
@@ -140,7 +140,14 @@ def test_get_roast_done(env):
     body = r.json()
     assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
     assert body["cardUrl"] == f"/cards/{rid}.jpg" and body["result"]["score"] == 4
-    assert "profile" not in body and "sourceRef" not in body
+    assert body["cardGeneric"] is False
+    assert "profileText" not in body and "sourceRef" not in body
+
+
+def test_get_roast_flags_generic_card(env):
+    client, store, _ = env
+    rid = seed(store, cardGeneric=True)
+    assert client.get(f"/api/roasts/{rid}").json()["cardGeneric"] is True
 
 
 def test_expired_roast_is_gone_even_before_ttl_deletes_it(env):

@@ -5,6 +5,7 @@ import pytest
 from PIL import Image
 
 from app import ai, pipeline
+from app import card as card_mod
 from app.card import MAX_BYTES, OG_SIZE, to_og_jpeg
 from app.config import Settings
 from app.errors import PermanentError
@@ -49,7 +50,7 @@ def test_happy_path_walks_every_state(intensity):
     pipeline.run(RID, store, S)
     doc = store.docs[RID]
     assert store.history == ["extracting", "roasting", "rendering", "done"]
-    assert doc["cardPath"] == f"{RID}.jpg"
+    assert doc["cardPath"] == f"{RID}.jpg" and doc["cardGeneric"] is False
     assert 1 <= doc["result"]["score"] <= 10
     assert len(doc["result"]["tips"]) == 3
     img = Image.open(io.BytesIO(store.cards[f"{RID}.jpg"]))
@@ -71,17 +72,59 @@ def test_transient_error_raises_until_last_attempt(monkeypatch):
     def flaky(*a, **k):
         raise RuntimeError("503 from Vertex")
 
-    monkeypatch.setattr(pipeline.ai, "card_image", flaky)
+    monkeypatch.setattr(pipeline.ai, "roast", flaky)
     store = FakeStore(new_doc())
     with pytest.raises(RuntimeError):
         pipeline.run(RID, store, S, attempt=0)
-    assert store.docs[RID]["status"] == "rendering"
-    # roast is already visible while rendering
-    assert store.docs[RID]["result"]["headline"]
+    assert store.docs[RID]["status"] == "roasting"
+    assert store.docs[RID]["profileText"]  # extraction is not paid for again
 
     pipeline.run(RID, store, S, attempt=3)  # 4th attempt = last one
     assert store.docs[RID]["status"] == "failed"
     assert "Intenta de nuevo" in store.docs[RID]["error"]
+
+
+@pytest.fixture
+def no_card_delay(monkeypatch):
+    monkeypatch.setattr(pipeline, "CARD_RETRY_DELAY_S", 0)
+
+
+@pytest.mark.parametrize("error, calls", [(RuntimeError("429 RESOURCE_EXHAUSTED"), 2), (PermanentError("filtros"), 1)])
+def test_failed_card_falls_back_to_generic(monkeypatch, no_card_delay, error, calls):
+    seen = []
+
+    def broken(*a, **k):
+        seen.append(1)
+        raise error
+
+    monkeypatch.setattr(pipeline.ai, "card_image", broken)
+    store = FakeStore(new_doc(intensity="brutal"))
+    pipeline.run(RID, store, S, attempt=0)  # must not raise: the roast is already usable
+    doc = store.docs[RID]
+    assert doc["status"] == "done" and doc["cardGeneric"] is True
+    assert store.cards[f"{RID}.jpg"] == (card_mod.ASSETS / "fallback-brutal.jpg").read_bytes()
+    assert len(seen) == calls  # a blocked prompt is not retried
+
+
+def test_card_succeeds_on_second_try(monkeypatch, no_card_delay):
+    calls, real = [], ai.card_image
+
+    def flaky(result, intensity, s):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("503")
+        return real(result, intensity, S)
+
+    monkeypatch.setattr(pipeline.ai, "card_image", flaky)
+    store = FakeStore(new_doc())
+    pipeline.run(RID, store, S)
+    assert store.docs[RID]["cardGeneric"] is False
+
+
+@pytest.mark.parametrize("intensity", ai.INTENSITIES)
+def test_fallback_cards_are_og_sized(intensity):
+    img = Image.open(io.BytesIO(card_mod.fallback_jpeg(intensity)))
+    assert img.size == OG_SIZE and img.format == "JPEG"
 
 
 def test_retry_resumes_from_saved_step(monkeypatch):
@@ -206,10 +249,6 @@ def test_card_prompt_strips_injection_characters():
     assert '"Hola x b"' in prompt
     assert "RECHAZADO" in prompt and "7/10" in prompt
     assert "illustration of a caty" in prompt
-
-
-def test_card_prompt_works_for_roasts_without_scene():
-    assert ai.GENERIC_SCENE in ai.card_prompt({"name": "Ana", "headline": "Hola", "score": 3}, "soft")
 
 
 def test_og_jpeg_is_small_and_sized():

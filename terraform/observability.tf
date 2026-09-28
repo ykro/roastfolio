@@ -21,6 +21,11 @@ locals {
       service     = local.worker_service
       event       = "roast_failed"
     }
+    roastfolio_cards_generic = {
+      description = "Roasts that got the generic certificate because Nano Banana failed (worker)"
+      service     = local.worker_service
+      event       = "card_fallback"
+    }
   }
 }
 

@@ -28,6 +28,8 @@ counter roastfolio_roasts_done "Roasts finished OK (worker)" \
   "$RUN AND resource.labels.service_name=\"$WORKER_SERVICE\" AND jsonPayload.event=\"roast_done\""
 counter roastfolio_roasts_failed "Roasts marked failed (worker)" \
   "$RUN AND resource.labels.service_name=\"$WORKER_SERVICE\" AND jsonPayload.event=\"roast_failed\""
+counter roastfolio_cards_generic "Roasts that got the generic certificate because Nano Banana failed (worker)" \
+  "$RUN AND resource.labels.service_name=\"$WORKER_SERVICE\" AND jsonPayload.event=\"card_fallback\""
 
 cat > "$GEN_DIR/roastfolio_step_duration.yaml" <<YAML
 description: Duration of each pipeline step (extracting, roasting, rendering)

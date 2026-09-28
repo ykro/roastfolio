@@ -163,7 +163,6 @@ function Progress({ roast }: { roast: Roast }) {
 }
 
 function Verdict({ roast, result, onNew }: { roast: Roast; result: RoastResult; onNew: () => void }) {
-  const burns = result.burns ?? []
   return (
     <article>
       <header className="border-b-2 border-ink pb-6">
@@ -188,13 +187,11 @@ function Verdict({ roast, result, onNew }: { roast: Roast; result: RoastResult; 
             ))}
           </div>
 
-          {burns.length > 0 && <Findings burns={burns} />}
+          <Findings burns={result.burns} />
 
-          {result.closer && (
-            <p className="display mt-8 max-w-2xl border-l-4 border-stamp pl-4 text-3xl text-stamp sm:text-4xl">
-              {result.closer}
-            </p>
-          )}
+          <p className="display mt-8 max-w-2xl border-l-4 border-stamp pl-4 text-3xl text-stamp sm:text-4xl">
+            {result.closer}
+          </p>
 
           <Corrections tips={result.tips} />
         </div>
@@ -214,6 +211,12 @@ function Verdict({ roast, result, onNew }: { roast: Roast; result: RoastResult; 
               <span className="animate-pulse text-lg">Imprimiendo tu certificado…</span>
               <span className="text-sm">Unos segundos más</span>
             </div>
+          )}
+          {roast.cardGeneric && (
+            <p className="mt-3 text-sm text-ink-soft">
+              El generador de imágenes estaba saturado, así que esta vez te tocó el certificado genérico. Tu roast y tu
+              nota son los de siempre.
+            </p>
           )}
           {roast.status === 'done' ? (
             <ShareBar roast={roast} result={result} onNew={onNew} />
@@ -246,7 +249,7 @@ function Findings({ burns }: { burns: Burn[] }) {
   )
 }
 
-function Corrections({ tips }: { tips: (Tip | string)[] }) {
+function Corrections({ tips }: { tips: Tip[] }) {
   return (
     <section className="mt-12 border-2 border-ink bg-sheet">
       <div className="border-b-2 border-ink px-5 py-4 sm:px-7">
@@ -257,7 +260,9 @@ function Corrections({ tips }: { tips: (Tip | string)[] }) {
         {tips.map((tip, i) => (
           <li key={i} className="flex gap-3 px-5 py-6 sm:gap-4 sm:px-7">
             <span className="font-type text-xl font-bold text-stamp">{i + 1}.</span>
-            <div className="min-w-0 flex-1">{typeof tip === 'string' ? <p className="leading-relaxed">{tip}</p> : <TipBody tip={tip} />}</div>
+            <div className="min-w-0 flex-1">
+              <TipBody tip={tip} />
+            </div>
           </li>
         ))}
       </ol>

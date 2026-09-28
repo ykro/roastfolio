@@ -1,6 +1,7 @@
 """Card post-processing: Nano Banana output -> 1200x630 JPEG, light enough for social previews."""
 
 import io
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
@@ -17,6 +18,14 @@ def to_og_jpeg(raw: bytes) -> bytes:
         if buf.tell() <= MAX_BYTES:
             break
     return buf.getvalue()
+
+
+ASSETS = Path(__file__).parent / "assets"
+
+
+def fallback_jpeg(intensity: str) -> bytes:
+    """Pre-generated generic certificate (same style per intensity) for when Nano Banana fails."""
+    return (ASSETS / f"fallback-{intensity}.jpg").read_bytes()
 
 
 def _font(size: int):

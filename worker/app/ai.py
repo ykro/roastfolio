@@ -252,7 +252,7 @@ def card_prompt(result: dict, intensity: str) -> str:
     return CARD_PROMPT.format(
         name=_safe(result["name"]),
         headline=_safe(result["headline"]),
-        scene=_safe(result.get("scene") or GENERIC_SCENE),
+        scene=_safe(result["scene"]),
         score=int(result["score"]),
         **CARD_STYLES[intensity],
     )

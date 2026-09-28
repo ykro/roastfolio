@@ -49,6 +49,7 @@ def public_view(roast_id: str, doc: dict) -> dict:
         view["result"] = doc["result"]
     if doc.get("cardPath"):
         view["cardUrl"] = f"/cards/{doc['cardPath']}"
+        view["cardGeneric"] = bool(doc.get("cardGeneric"))
     if doc["status"] == "failed":
         view["error"] = doc.get("error") or "No pudimos generar tu roast."
     return view

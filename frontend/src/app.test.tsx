@@ -96,12 +96,10 @@ describe('RoastPage', () => {
     expect(screen.getByRole('button', { name: 'Copiar enlace' })).toBeInTheDocument()
   })
 
-  it('still renders roasts made with the old plain-text tips', async () => {
-    const old = { ...result, burns: undefined, closer: undefined, tips: ['Consejo viejo', 'b', 'c'] }
-    mockFetch({ status: 200, body: { ...base, status: 'done', result: old, cardUrl: '/cards/x.jpg' } })
+  it('explains when the certificate is the generic one', async () => {
+    mockFetch({ status: 200, body: { ...base, status: 'done', result, cardUrl: '/cards/x.jpg', cardGeneric: true } })
     render(<RoastPage id={base.id} onNew={() => {}} />)
-    expect(await screen.findByText('Consejo viejo')).toBeInTheDocument()
-    expect(screen.queryByText('Observaciones del revisor')).not.toBeInTheDocument()
+    expect(await screen.findByText(/te tocó el certificado genérico/)).toBeInTheDocument()
   })
 
   it('copies the rewritten text of a tip', async () => {

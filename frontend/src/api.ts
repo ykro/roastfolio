@@ -16,13 +16,12 @@ export interface Tip {
 export interface RoastResult {
   name: string
   headline: string
-  /** Opening lines. Roasts made before burns existed carry the whole text here. */
+  /** Opening lines. */
   roast: string
-  burns?: Burn[]
-  closer?: string
+  burns: Burn[]
+  closer: string
   score: number
-  /** Plain strings in roasts made before the before/after format. */
-  tips: (Tip | string)[]
+  tips: Tip[]
 }
 
 export interface Roast {
@@ -33,6 +32,8 @@ export interface Roast {
   expiresAt: string
   result?: RoastResult
   cardUrl?: string
+  /** True when Nano Banana failed and the worker used the pre-made generic certificate. */
+  cardGeneric?: boolean
   error?: string
 }
 

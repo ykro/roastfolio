@@ -57,10 +57,11 @@ export async function createRoast(input: {
   } catch {
     throw new ApiError('No hay conexión con el servidor. Revisa tu internet e intenta otra vez.')
   }
-  if (res.status === 429) {
-    throw new ApiError('Llegaste al límite de 5 roasts cada 10 minutos. Espera un rato y vuelve a intentarlo.')
-  }
   const body = await res.json().catch(() => ({}))
+  if (res.status === 429) {
+    // With a JSON detail it's the app's daily cap; Cloud Armor's per-IP limit comes without a body.
+    throw new ApiError(body.detail ?? 'Llegaste al límite de 5 roasts cada 10 minutos. Espera un rato y vuelve a intentarlo.')
+  }
   if (!res.ok) {
     // Cloud Armor blocks come back as 403 without a JSON body.
     throw new ApiError(body.detail ?? 'No pudimos recibir tu solicitud. Intenta de nuevo.')

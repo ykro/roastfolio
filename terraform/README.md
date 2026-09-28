@@ -112,8 +112,9 @@ Después del primer `apply`, los bloques de `import.tf` ya no hacen nada y los p
 - **El contenido del bucket `site`.** Lo publica `cloudbuild.yaml`.
 - **Los valores de los secretos.** Terraform crea `apify-token` y sus permisos, pero la versión con el token se agrega a mano. El secreto con el token de GitHub lo crea Cloud Build durante la autorización; Terraform solo administra quién lo puede leer.
 - **La autorización de la GitHub App**, que necesita un humano en el navegador.
-- **El bucket `<project>_cloudbuild`**, que es el bucket por defecto de Cloud Build y lo comparten otros builds del proyecto.
+- **El bucket `<project>_cloudbuild`**, que es el bucket por defecto de Cloud Build y se crea fuera de Terraform.
 - **Workload Identity Federation / GitHub Actions**: se quitó del proyecto; el CI/CD es 100% Cloud Build.
+- **El presupuesto de Cloud Billing.** Vive en la cuenta de facturación, no en el proyecto; lo crea `infra/14-budget.sh`, que lee la cuenta en tiempo de ejecución para que su id no quede en el repo.
 
 ## Destruir
 

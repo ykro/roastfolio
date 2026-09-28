@@ -176,7 +176,7 @@ El agente de servicio de Cloud Build solo puede **leer** el secreto que guarda e
 ### Riesgos conocidos
 
 - Cloud Armor protege el backend de web, pero no los backend buckets `site` y `cards`: ahí solo hay contenido estático y público, servido desde el CDN. El siguiente paso sería una *edge security policy* para esos dos.
-- El rate limit es por IP. Alguien con muchas IPs puede generar más roasts, y cada uno cuesta unos 6 centavos. El máximo de instancias del worker pone un techo de unos $180 por hora. La alerta y el dashboard existen para ver algo así a tiempo.
+- El rate limit es por IP. Alguien con muchas IPs puede generar más roasts, y cada uno cuesta unos 6 centavos. Por eso web tiene además un **tope diario de 450 roasts** (`DAILY_ROAST_LIMIT`, hora de Guatemala): unos $28 de IA más el costo fijo, cerca de $30 al día. Un contador en Firestore, dentro de una transacción, rechaza con 429 lo que pase de ahí. Un presupuesto de Cloud Billing de $900 al mes avisa por correo al 50, 90 y 100 % (`infra/14-budget.sh`); el presupuesto solo alerta, el tope es el que detiene el gasto.
 
 ## Costos
 
@@ -238,6 +238,9 @@ for s in infra/0*.sh infra/1[0-2]*.sh; do bash "$s"; done
 # 4. CI/CD: imprime un link para autorizar GitHub; autoriza y vuelve a correrlo
 bash infra/13-build-trigger.sh
 bash infra/13-build-trigger.sh
+
+# 5. Presupuesto con alertas (necesita permiso sobre la cuenta de facturación)
+bash infra/14-budget.sh
 ```
 
 | Script | Qué hace |
@@ -255,6 +258,7 @@ bash infra/13-build-trigger.sh
 | `11-armor.sh` | Aplica las reglas OWASP y los rate limits |
 | `12-observability.sh` | Crea las métricas, la alerta por correo y el dashboard |
 | `13-build-trigger.sh` | Conecta GitHub y crea el trigger de Cloud Build |
+| `14-budget.sh` | Crea el presupuesto mensual con alertas por correo |
 
 Todos los scripts son idempotentes: puedes correrlos otra vez sin romper nada.
 
@@ -326,8 +330,12 @@ roastfolio/
 ├── frontend/          React + Vite + Tailwind (UI en español), vitest
 ├── web/               FastAPI: POST/GET /api/roasts, GET /r/{id}; pytest
 ├── worker/            FastAPI: POST /internal/process (pipeline); pytest
-├── infra/             scripts gcloud numerados (01 → 13) + env.sh
+├── infra/             scripts gcloud numerados (01 → 14) + env.sh
 ├── terraform/         la misma infraestructura en Terraform, con imports del proyecto actual
 ├── docs/              onboarding, costos y diagramas
 └── cloudbuild.yaml    tests → imágenes → Cloud Run → bucket site
 ```
+
+## Licencia
+
+[MIT](LICENSE). Úsalo, cámbialo y llévalo a tu propio proyecto de GCP.

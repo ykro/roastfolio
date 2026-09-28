@@ -61,7 +61,8 @@ La fórmula no descuenta las capas gratuitas de Cloud Run, Firestore y Storage, 
 
 **Riesgos y controles.**
 
-- **Abuso.** Cloud Armor limita a 5 roasts por IP cada 10 minutos. Aun así, alguien con muchas IPs podría generar tráfico caro. **El techo físico** lo pone la configuración del worker: 5 instancias con 4 roasts simultáneos cada una procesan como máximo unos 2,880 roasts por hora, o sea **$180 por hora** en el peor caso sostenido. Recomendación: un presupuesto en Cloud Billing con alertas al 50, 90 y 100 % de lo esperado.
+- **Abuso.** Cloud Armor limita a 5 roasts por IP cada 10 minutos. Aun así, alguien con muchas IPs podría generar tráfico caro. **El techo es de unos $30 al día:** web acepta como máximo 450 roasts diarios (`DAILY_ROAST_LIMIT`, hora de Guatemala), unos $28 de IA más el costo fijo, y rechaza el resto con un mensaje claro. Sin ese tope, el límite lo pondría el worker: 5 instancias con 4 roasts simultáneos procesan hasta 2,880 roasts por hora, unos $180 por hora.
+- **Presupuesto.** Cloud Billing tiene un presupuesto de $900 al mes para el proyecto, con alertas por correo al 50, 90 y 100 % del gasto real y al 100 % del pronóstico (`infra/14-budget.sh`). Un presupuesto solo avisa; el que detiene el gasto es el tope diario.
 - **Fin del precio introductorio (1-ene-2027).** Ya está incluido en las tablas: no es una sorpresa.
 - **Cuota de imágenes de Vertex AI.** No es un costo sino un límite de capacidad. Si se agota, el usuario recibe el certificado genérico y el roast no falla. La métrica `roastfolio_cards_generic` cuenta cuántas veces pasa. Arriba de unos 10,000 usuarios al mes conviene pedir más cuota.
 - **Tipo de cambio.** Todo se factura en USD. Los montos en quetzales usan 7.75 Q/USD como referencia.
@@ -104,7 +105,7 @@ Escenarios: **(a)** 1,000 usuarios (1,500 roasts), **(b)** 10,000 usuarios (15,0
 | — | Apify (fuera de GCP) | ~$4 / 1,000 perfiles | — | perfiles × 0.004 (450 / 4,500) | 1.80 | 18.00 | 0 |
 | | **Total** | | | | **125.23** | **964.35** | **33.29** |
 
-**Sin ninguna capa gratuita** (si la cuenta de facturación ya la gastó), Cloud Run suma $1.69 en (a) y $5.22 más en (b), y Cloud Build $0.54. Firestore y Storage agregan centavos. Esto importa porque **las capas gratuitas son por cuenta de facturación**, no por proyecto.
+**Sin ninguna capa gratuita** (si la cuenta de facturación ya la gastó), Cloud Run suma $1.69 en (a) y $5.22 más en (b), y Cloud Build $0.54. Firestore y Storage agregan centavos. Esto importa porque **las capas gratuitas son por cuenta de facturación, no por proyecto**.
 
 **Monitoring:** las alertas no se cobran todavía. Desde el 1 de septiembre de 2027 costarán $0.35 por referencia a una métrica, así que la alerta de tasa de error (2 métricas) pasará a unos $0.70 al mes.
 
@@ -174,7 +175,6 @@ La calculadora aplica las capas gratuitas como si tuvieras la cuenta solo para e
 - **La regla por defecto de Cloud Armor.** La política tiene 11 reglas (10 propias y la default `2147483647`). La página de precios no dice si la default se cobra; aquí se cuentan 10. Si la cobran, suma $1 al mes.
 - **Firestore gratis.** La página de precios dice que las bases con nombre no tienen cuota gratuita, pero `gcloud firestore databases describe --database=roastfolio` devuelve `freeTier: True` (es la única base del proyecto). Sin cuota gratuita, Firestore costaría unos $0.02 en (a) y $0.17 en (b).
 - **Apify.** El precio de `harvestapi/linkedin-profile-scraper` (~$4 por 1,000 perfiles) viene del README del actor y no se revisó contra la factura de Apify.
-- **Presupuesto de Cloud Billing.** No se pudo revisar si la cuenta ya tiene uno: la API `billingbudgets.googleapis.com` no está habilitada en el proyecto y la cuenta de facturación no dio permiso de lectura.
 - **El tráfico de CDN** supone que cada page view descarga el sitio completo, sin caché del navegador. Es conservador.
 
 ## Fuentes

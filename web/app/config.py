@@ -21,6 +21,8 @@ class Settings:
     # Absolute origin for og:image, e.g. https://34.1.2.3.nip.io (falls back to the request host).
     public_base_url: str = os.getenv("PUBLIC_BASE_URL", "")
     ttl_hours: int = int(os.getenv("TTL_HOURS", "24"))
+    # Hard cap on new roasts per day (Guatemala time). At ~$0.062 each, 450 is ~$28/day of AI spend.
+    daily_roast_limit: int = int(os.getenv("DAILY_ROAST_LIMIT", "450"))
     max_pdf_bytes: int = 5 * 1024 * 1024
     max_pdf_pages: int = 5
     # LOCAL_MODE: files under LOCAL_DATA_DIR instead of Firestore/GCS, worker called directly.

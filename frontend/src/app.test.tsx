@@ -62,6 +62,16 @@ describe('Home', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('5 roasts cada 10 minutos')
   })
 
+  it('shows the daily limit message from the API', async () => {
+    mockFetch({ status: 429, body: { detail: 'Roastfolio llegó a su límite de roasts por hoy. Vuelve mañana.' } })
+    render(<Home onCreated={() => {}} />)
+    await userEvent.click(screen.getByRole('tab', { name: 'URL de LinkedIn' }))
+    await userEvent.type(screen.getByPlaceholderText('linkedin.com/in/tu-usuario'), 'linkedin.com/in/ykro')
+    await userEvent.click(screen.getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: 'Roastear mi perfil' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('límite de roasts por hoy')
+  })
+
   it('rejects files that are not PDFs', async () => {
     render(<Home onCreated={() => {}} />)
     const file = new File(['hola'], 'cv.docx', { type: 'application/msword' })

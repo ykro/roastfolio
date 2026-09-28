@@ -34,6 +34,13 @@ class FakeStore:
     def site_index(self):
         return INDEX
 
+    def take_daily_slot(self, day, limit):
+        self.days = getattr(self, "days", {})
+        if self.days.get(day, 0) >= limit:
+            return False
+        self.days[day] = self.days.get(day, 0) + 1
+        return True
+
 
 class FakeQueue:
     def __init__(self):
@@ -191,3 +198,20 @@ def test_normalize_linkedin_variants():
 def test_render_share_page_without_head_tags():
     out = render_share_page("<html><head><title>x</title></head></html>", {"title": "T", "description": "D"})
     assert "<title>T</title>" in out and 'name="description" content="D"' in out
+
+
+def test_daily_limit_stops_new_roasts():
+    store, queue = FakeStore(), FakeQueue()
+    client = TestClient(create_app(store, queue, Settings(daily_roast_limit=2)))
+    ok = [post(client, data={"url": "https://linkedin.com/in/ykro"}) for _ in range(2)]
+    assert [r.status_code for r in ok] == [201, 201]
+    r = post(client, data={"url": "https://linkedin.com/in/ykro"})
+    assert r.status_code == 429 and "límite de roasts por hoy" in r.json()["detail"]
+    assert len(queue.ids) == 2 and len(store.docs) == 2
+
+
+def test_invalid_input_does_not_use_a_daily_slot():
+    store, queue = FakeStore(), FakeQueue()
+    client = TestClient(create_app(store, queue, Settings(daily_roast_limit=1)))
+    assert post(client, data={"url": "https://example.com/nope"}).status_code == 400
+    assert post(client, data={"url": "https://linkedin.com/in/ykro"}).status_code == 201

@@ -106,6 +106,8 @@ Si agregas una llamada nueva a un servicio externo, decide a cuál de los dos gr
 
 **Cambiar de modelo.** `GEMINI_TEXT_MODEL` y `GEMINI_IMAGE_MODEL` son variables de entorno del worker, definidas en `infra/09-run.sh`.
 
+**Cambiar el tope diario.** `DAILY_ROAST_LIMIT` en web (450 por defecto, hora de Guatemala). El contador vive en la colección `limits` de Firestore, un documento por día.
+
 **Cambiar configuración de runtime** (variables, memoria, concurrencia, service account). Va en `infra/09-run.sh` (y en `terraform/run.tf`). `cloudbuild.yaml` solo cambia la imagen, a propósito: así un push no puede cambiar permisos ni configuración sin que se note en la revisión de infra.
 
 **Agregar un campo al resultado.** Toca el esquema `ROAST_SCHEMA` y `clean_result` en `ai.py`, el tipo en `frontend/src/api.ts` y la vista en `RoastPage.tsx`. Si el campo debe salir en la vista previa, también `render_share_page` en `web/app/main.py`.

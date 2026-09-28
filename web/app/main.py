@@ -18,6 +18,8 @@ from .validation import INTENSITIES, InvalidInput, check_pdf, normalize_linkedin
 
 ROAST_ID = re.compile(r"^[A-Za-z0-9_-]{16,40}$")
 NO_STORE = {"Cache-Control": "no-store"}
+GUATEMALA = timezone(timedelta(hours=-6))  # no daylight saving time
+DAILY_LIMIT_MESSAGE = "Roastfolio llegó a su límite de roasts por hoy. Vuelve mañana."
 
 FALLBACK_INDEX = """<!doctype html><html lang="es"><head><meta charset="utf-8">
 <title>Roastfolio</title></head><body><div id="root"></div></body></html>"""
@@ -121,13 +123,23 @@ def create_app(store: Store | None = None, queue: Queue | None = None, s: Settin
 
         roast_id = secrets.token_urlsafe(16)
         now = datetime.now(timezone.utc)
+        # Validate first so a rejected input never uses up one of the day's roasts.
         if has_pdf:
             data = await pdf.read(s.max_pdf_bytes + 1)
             pages = check_pdf(data, s.max_pdf_bytes, s.max_pdf_pages)
-            source, source_ref = "pdf", get_store().put_upload(f"{roast_id}.pdf", data)
         else:
             pages = None
-            source, source_ref = "url", normalize_linkedin(url)
+            linkedin_url = normalize_linkedin(url)
+
+        day = now.astimezone(GUATEMALA).date().isoformat()
+        if not get_store().take_daily_slot(day, s.daily_roast_limit):
+            log("daily roast limit reached", "WARNING", step="queued", event="daily_limit", day=day)
+            return JSONResponse({"detail": DAILY_LIMIT_MESSAGE}, status_code=429, headers=NO_STORE)
+
+        if has_pdf:
+            source, source_ref = "pdf", get_store().put_upload(f"{roast_id}.pdf", data)
+        else:
+            source, source_ref = "url", linkedin_url
 
         get_store().create(roast_id, {
             "status": "queued",

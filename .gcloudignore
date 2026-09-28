@@ -1,0 +1,11 @@
+# Source uploaded by `gcloud builds submit` (keeps the tarball small)
+.git
+.github
+**/.venv
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+.localdata
+infra/.generated
+*.tsbuildinfo

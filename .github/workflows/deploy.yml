@@ -1,0 +1,50 @@
+# Push to main -> Cloud Build runs cloudbuild.yaml (tests, images, Cloud Run, site).
+# Auth is keyless: GitHub's OIDC token is exchanged through Workload Identity Federation
+# (infra/14-github-actions.sh) for short-lived credentials of sa-build.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: ai-experiments-487722
+  REGION: us-central1
+  SA_BUILD: sa-build@ai-experiments-487722.iam.gserviceaccount.com
+
+jobs:
+  cloud-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/611681112050/locations/global/workloadIdentityPools/github/providers/roastfolio
+          service_account: ${{ env.SA_BUILD }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Run cloudbuild.yaml on Cloud Build
+        run: |
+          BUILD_ID=$(gcloud builds submit . --config cloudbuild.yaml --region "$REGION" \
+            --project "$PROJECT_ID" --service-account "projects/$PROJECT_ID/serviceAccounts/$SA_BUILD" \
+            --async --format='value(id)')
+          echo "Build: https://console.cloud.google.com/cloud-build/builds;region=$REGION/$BUILD_ID?project=$PROJECT_ID"
+          while true; do
+            STATUS=$(gcloud builds describe "$BUILD_ID" --region "$REGION" --project "$PROJECT_ID" --format='value(status)')
+            case "$STATUS" in
+              SUCCESS) echo "Cloud Build: $STATUS"; exit 0 ;;
+              FAILURE|INTERNAL_ERROR|TIMEOUT|CANCELLED|EXPIRED) echo "Cloud Build: $STATUS"; exit 1 ;;
+            esac
+            sleep 15
+          done

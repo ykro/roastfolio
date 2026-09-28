@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roastfolio · Secuencia de un roast</title>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f7faf7;
+      --color-paper-2: #e9f0eb;
+      --color-ink:     #22306b;
+      --color-muted:   #4c5a8f;
+      --color-soft:    #7d88b0;
+      --color-rule:    rgba(34,48,107,0.12);
+      --color-accent:  #c4232b;
+      --color-link:    #2f7d6b;
+      --font-sans:     'Archivo', system-ui, sans-serif;
+      --font-mono:     'Courier Prime', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1040px; width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-sans);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 1.9rem);
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Secuencia · Roastfolio</p>
+    <h1>Un roast, del POST al resultado</h1>
+
+    <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="secuencia-title secuencia-desc">
+      <title id="secuencia-title">Roastfolio: secuencia de un roast</title>
+      <desc id="secuencia-desc">Diagrama de secuencia: el navegador envía el PDF o la URL a web, que valida, guarda el archivo, crea el documento queued en Firestore, encola una tarea en Cloud Tasks y responde con el id; Cloud Tasks entrega la tarea al worker con OIDC, el worker avanza el estado en Firestore hasta done mientras el navegador consulta el roast cada 2 segundos.</desc>
+      <defs>
+        <marker id="secuencia-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#4c5a8f"/>
+        </marker>
+        <marker id="secuencia-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#c4232b"/>
+        </marker>
+        <marker id="secuencia-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#2f7d6b"/>
+        </marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f7faf7"/>
+
+      <!-- LIFELINES · centers 112 (Navegador), 296 (web), 480 (Cloud Tasks), 664 (worker), 848 (Firestore) -->
+      <g stroke="rgba(34,48,107,0.22)" stroke-width="1" stroke-dasharray="3,3">
+        <line x1="112" y1="96" x2="112" y2="528"/>
+        <line x1="296" y1="96" x2="296" y2="528"/>
+        <line x1="480" y1="96" x2="480" y2="528"/>
+        <line x1="664" y1="96" x2="664" y2="528"/>
+        <line x1="848" y1="96" x2="848" y2="528"/>
+      </g>
+
+      <!-- LOOP FRAME · spans only Navegador + web; drawn before messages -->
+      <rect x="56" y="324" width="292" height="180" rx="4" fill="none" stroke="rgba(34,48,107,0.22)" stroke-width="1"/>
+      <rect x="56" y="324" width="40" height="16" rx="2" fill="#f7faf7" stroke="rgba(34,48,107,0.22)" stroke-width="1"/>
+      <text x="76" y="335" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" font-weight="700" text-anchor="middle" letter-spacing="0.12em">LOOP</text>
+      <rect x="64" y="348" width="156" height="11" rx="2" fill="#f7faf7"/>
+      <text x="68" y="356" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" letter-spacing="0.02em">[cada 2 s, hasta done o failed]</text>
+      <rect x="64" y="460" width="172" height="24" rx="2" fill="#f7faf7"/>
+      <text x="68" y="468" fill="#7d88b0" font-size="8" font-family="'Courier Prime', monospace">la UI muestra el roast en cuanto</text>
+      <text x="68" y="480" fill="#7d88b0" font-size="8" font-family="'Courier Prime', monospace">existe result, antes de la tarjeta</text>
+
+      <!-- ACTIVATION BARS -->
+      <g fill="rgba(34,48,107,0.06)" stroke="#4c5a8f" stroke-width="0.8">
+        <rect x="292" y="144" width="8" height="160"/>
+        <rect x="292" y="388" width="8" height="40"/>
+        <rect x="476" y="272" width="8" height="216"/>
+        <rect x="660" y="336" width="8" height="152"/>
+      </g>
+
+      <!-- MESSAGES (time flows down) -->
+      <!-- 1 · Navegador → web -->
+      <line x1="112" y1="144" x2="292" y2="144" stroke="#2f7d6b" stroke-width="1.2" marker-end="url(#secuencia-arrow-link)"/>
+      <!-- 2 · web self: validate + store PDF -->
+      <path d="M300 164 H332 V196 H300" fill="none" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#secuencia-arrow)"/>
+      <!-- 3 · web → Firestore -->
+      <line x1="300" y1="236" x2="848" y2="236" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#secuencia-arrow)"/>
+      <!-- 4 · web → Cloud Tasks (focal) -->
+      <line x1="300" y1="272" x2="476" y2="272" stroke="#c4232b" stroke-width="1.4" marker-end="url(#secuencia-arrow-accent)"/>
+      <!-- 5 · web → Navegador (return) -->
+      <line x1="292" y1="304" x2="112" y2="304" stroke="#4c5a8f" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#secuencia-arrow)"/>
+      <!-- 6 · Cloud Tasks → worker (focal) -->
+      <line x1="484" y1="336" x2="660" y2="336" stroke="#c4232b" stroke-width="1.4" marker-end="url(#secuencia-arrow-accent)"/>
+      <!-- 7 · worker → Firestore: status per step -->
+      <line x1="668" y1="376" x2="848" y2="376" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#secuencia-arrow)"/>
+      <!-- 8 · Navegador → web: poll -->
+      <line x1="112" y1="388" x2="292" y2="388" stroke="#2f7d6b" stroke-width="1.2" marker-end="url(#secuencia-arrow-link)"/>
+      <!-- 9 · worker self: AI calls -->
+      <path d="M668 400 H700 V428 H668" fill="none" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#secuencia-arrow)"/>
+      <!-- 10 · web → Navegador: poll result -->
+      <line x1="292" y1="428" x2="112" y2="428" stroke="#4c5a8f" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#secuencia-arrow)"/>
+      <!-- 11 · worker → Firestore: done -->
+      <line x1="668" y1="460" x2="848" y2="460" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#secuencia-arrow)"/>
+      <!-- 12 · worker → Cloud Tasks: ack -->
+      <line x1="660" y1="488" x2="484" y2="488" stroke="#4c5a8f" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#secuencia-arrow)"/>
+
+      <!-- MESSAGE LABELS · opaque paper masks, 6-10px above their stroke -->
+      <g font-family="'Courier Prime', monospace" font-size="9" fill="#4c5a8f">
+        <rect x="140" y="112" width="128" height="24" rx="2" fill="#f7faf7"/>
+        <text x="204" y="121" fill="#2f7d6b" text-anchor="middle">POST /api/roasts</text>
+        <text x="204" y="132" fill="#2f7d6b" text-anchor="middle">PDF o URL + intensidad</text>
+
+        <rect x="338" y="160" width="132" height="38" rx="2" fill="#f7faf7"/>
+        <text x="342" y="170">valida: máx. 5 MB y</text>
+        <text x="342" y="182">5 págs, o URL LinkedIn</text>
+        <text x="342" y="194">guarda PDF en uploads</text>
+
+        <rect x="316" y="218" width="144" height="12" rx="2" fill="#f7faf7"/>
+        <text x="388" y="227" text-anchor="middle">crea roasts/{id}: queued</text>
+
+        <rect x="336" y="254" width="104" height="12" rx="2" fill="#f7faf7"/>
+        <text x="388" y="263" fill="#c4232b" font-weight="700" text-anchor="middle">encola tarea {id}</text>
+
+        <rect x="172" y="286" width="64" height="12" rx="2" fill="#f7faf7"/>
+        <text x="204" y="295" text-anchor="middle">201 · {id}</text>
+
+        <rect x="504" y="306" width="136" height="24" rx="2" fill="#f7faf7"/>
+        <text x="572" y="315" fill="#c4232b" font-weight="700" text-anchor="middle">POST /internal/process</text>
+        <text x="572" y="326" fill="#c4232b" text-anchor="middle">token OIDC · sa-tasks</text>
+
+        <rect x="688" y="346" width="136" height="24" rx="2" fill="#f7faf7"/>
+        <text x="756" y="355" text-anchor="middle">status: extracting ›</text>
+        <text x="756" y="366" text-anchor="middle">roasting › rendering</text>
+
+        <rect x="146" y="370" width="116" height="12" rx="2" fill="#f7faf7"/>
+        <text x="204" y="379" fill="#2f7d6b" text-anchor="middle">GET /api/roasts/{id}</text>
+
+        <rect x="706" y="402" width="124" height="24" rx="2" fill="#f7faf7"/>
+        <text x="710" y="411">Document AI / Apify</text>
+        <text x="710" y="422">Gemini · Nano Banana</text>
+
+        <rect x="144" y="410" width="120" height="12" rx="2" fill="#f7faf7"/>
+        <text x="204" y="419" text-anchor="middle">200 · status + result</text>
+
+        <rect x="704" y="442" width="104" height="12" rx="2" fill="#f7faf7"/>
+        <text x="756" y="451" text-anchor="middle">done + cardPath</text>
+
+        <rect x="494" y="470" width="156" height="12" rx="2" fill="#f7faf7"/>
+        <text x="572" y="479" text-anchor="middle">200 = ack · 5xx = reintento</text>
+      </g>
+
+      <!-- ACTOR BOXES · drawn last -->
+      <!-- Navegador (input / user) -->
+      <rect x="40" y="40" width="144" height="56" rx="6" fill="#f7faf7"/>
+      <rect x="40" y="40" width="144" height="56" rx="6" fill="rgba(76,90,143,0.10)" stroke="#7d88b0" stroke-width="1"/>
+      <rect x="48" y="46" width="28" height="12" rx="2" fill="transparent" stroke="rgba(125,136,176,0.45)" stroke-width="0.8"/>
+      <text x="62" y="55" fill="#7d88b0" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">USR</text>
+      <text x="112" y="72" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Navegador</text>
+      <text x="112" y="87" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">React · bucket site</text>
+
+      <!-- web (Cloud Run) -->
+      <rect x="224" y="40" width="144" height="56" rx="6" fill="#f7faf7"/>
+      <rect x="224" y="40" width="144" height="56" rx="6" fill="#ffffff" stroke="#22306b" stroke-width="1"/>
+      <rect x="232" y="46" width="28" height="12" rx="2" fill="transparent" stroke="rgba(34,48,107,0.40)" stroke-width="0.8"/>
+      <text x="246" y="55" fill="#4c5a8f" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">RUN</text>
+      <text x="296" y="72" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">web</text>
+      <text x="296" y="87" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">Cloud Run · API</text>
+
+      <!-- Cloud Tasks (async) -->
+      <rect x="408" y="40" width="144" height="56" rx="6" fill="#f7faf7"/>
+      <rect x="408" y="40" width="144" height="56" rx="6" fill="rgba(34,48,107,0.02)" stroke="rgba(34,48,107,0.30)" stroke-width="1" stroke-dasharray="4,3"/>
+      <rect x="416" y="46" width="32" height="12" rx="2" fill="transparent" stroke="rgba(34,48,107,0.25)" stroke-width="0.8"/>
+      <text x="432" y="55" fill="#7d88b0" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">COLA</text>
+      <text x="480" y="72" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Cloud Tasks</text>
+      <text x="480" y="87" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">cola roasts</text>
+
+      <!-- worker (Cloud Run, internal) -->
+      <rect x="592" y="40" width="144" height="56" rx="6" fill="#f7faf7"/>
+      <rect x="592" y="40" width="144" height="56" rx="6" fill="#ffffff" stroke="#22306b" stroke-width="1"/>
+      <rect x="600" y="46" width="28" height="12" rx="2" fill="transparent" stroke="rgba(34,48,107,0.40)" stroke-width="0.8"/>
+      <text x="614" y="55" fill="#4c5a8f" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">RUN</text>
+      <text x="664" y="72" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">worker</text>
+      <text x="664" y="87" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">Cloud Run · interno</text>
+
+      <!-- Firestore (store) -->
+      <rect x="776" y="40" width="144" height="56" rx="6" fill="#f7faf7"/>
+      <rect x="776" y="40" width="144" height="56" rx="6" fill="rgba(34,48,107,0.05)" stroke="#4c5a8f" stroke-width="1"/>
+      <rect x="784" y="46" width="24" height="12" rx="2" fill="transparent" stroke="rgba(76,90,143,0.40)" stroke-width="0.8"/>
+      <text x="796" y="55" fill="#4c5a8f" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
+      <text x="848" y="72" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Firestore</text>
+      <text x="848" y="87" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">roasts/{id}</text>
+
+      <!-- LEGEND · bottom strip -->
+      <line x1="40" y1="544" x2="920" y2="544" stroke="rgba(34,48,107,0.12)" stroke-width="0.8"/>
+      <text x="40" y="562" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" font-weight="700" letter-spacing="0.16em">LEYENDA</text>
+      <g font-family="'Archivo', sans-serif" font-size="9" fill="#4c5a8f">
+        <line x1="40" y1="580" x2="68" y2="580" stroke="#2f7d6b" stroke-width="1.2" marker-end="url(#secuencia-arrow-link)"/>
+        <text x="76" y="583">HTTP del navegador</text>
+        <line x1="208" y1="580" x2="236" y2="580" stroke="#c4232b" stroke-width="1.4" marker-end="url(#secuencia-arrow-accent)"/>
+        <text x="244" y="583">relevo asíncrono (foco)</text>
+        <line x1="400" y1="580" x2="428" y2="580" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#secuencia-arrow)"/>
+        <text x="436" y="583">llamada o escritura</text>
+        <line x1="568" y1="580" x2="596" y2="580" stroke="#4c5a8f" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#secuencia-arrow)"/>
+        <text x="604" y="583">respuesta</text>
+        <rect x="696" y="571" width="4" height="18" fill="rgba(34,48,107,0.06)" stroke="#4c5a8f" stroke-width="0.8"/>
+        <text x="708" y="583">activación</text>
+      </g>
+    </svg>
+  </div>
+</body>
+</html>

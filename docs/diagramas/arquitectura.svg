@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="arquitectura-title arquitectura-desc">
+      <title id="arquitectura-title">Arquitectura de Roastfolio en Google Cloud</title>
+      <desc id="arquitectura-desc">Diagrama de arquitectura: el usuario entra por un Load Balancer HTTPS con Cloud CDN para los buckets site y cards y Cloud Armor para la API; Cloud Run web guarda el PDF, crea el roast en Firestore y encola una tarea en Cloud Tasks, que invoca con OIDC al worker interno, el cual usa Document AI, Gemini, Nano Banana y Apify y publica el certificado en cards.</desc>
+      <defs>
+        <style>@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..700;1,62..125,400..700&amp;family=Courier+Prime:wght@400;700&amp;display=swap');</style>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4c5a8f"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#c4232b"/></marker>
+        <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2f7d6b"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f7faf7"/>
+
+      <!-- ============ ZONES (drawn first) ============ -->
+      <!-- Borde público -->
+      <rect x="156" y="80" width="360" height="296" rx="8" fill="#22306b" fill-opacity="0.02" stroke="#22306b" stroke-opacity="0.16" stroke-width="0.8"/>
+      <rect x="164" y="84" width="140" height="12" rx="2" fill="#f7faf7"/>
+      <text x="170" y="93" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" letter-spacing="0.14em">BORDE · ENTRADA PÚBLICA</text>
+
+      <!-- Red interna (trust boundary) -->
+      <rect x="536" y="252" width="500" height="308" rx="8" fill="#22306b" fill-opacity="0.02" stroke="#4c5a8f" stroke-opacity="0.55" stroke-width="0.9" stroke-dasharray="4,4"/>
+      <rect x="544" y="256" width="276" height="12" rx="2" fill="#f7faf7"/>
+      <text x="550" y="265" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" letter-spacing="0.14em">RED INTERNA · SIN ACCESO DESDE INTERNET</text>
+
+      <!-- IA administrada -->
+      <rect x="1052" y="208" width="188" height="216" rx="8" fill="#22306b" fill-opacity="0.02" stroke="#22306b" stroke-opacity="0.16" stroke-width="0.8"/>
+      <rect x="1060" y="212" width="168" height="12" rx="2" fill="#f7faf7"/>
+      <text x="1066" y="221" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" letter-spacing="0.14em">IA · VERTEX AI + DOCUMENT AI</text>
+
+      <!-- INTERNET eyebrow over the user -->
+      <text x="88" y="196" fill="#7d88b0" font-size="8" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.14em">INTERNET</text>
+
+      <!-- ============ ARROWS (behind nodes) ============ -->
+      <!-- User request path (link colour) -->
+      <line x1="136" y1="240" x2="172" y2="240" stroke="#2f7d6b" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+      <line x1="300" y1="144" x2="380" y2="144" stroke="#2f7d6b" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+      <line x1="300" y1="324" x2="380" y2="324" stroke="#2f7d6b" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+      <line x1="500" y1="136" x2="552" y2="136" stroke="#2f7d6b" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+      <path d="M 500,160 H 516 Q 524,160 524,168 V 184 Q 524,192 532,192 H 896" fill="none" stroke="#2f7d6b" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+      <line x1="500" y1="324" x2="552" y2="324" stroke="#2f7d6b" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+
+      <!-- web → uploads / Firestore / Cloud Tasks -->
+      <line x1="616" y1="356" x2="616" y2="452" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="680" y1="312" x2="724" y2="312" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M 680,336 H 694 Q 702,336 702,344 V 476 Q 702,484 710,484 H 724" fill="none" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- Async hop: Cloud Tasks → worker (focal) -->
+      <path d="M 852,484 H 908 Q 916,484 916,476 V 356" fill="none" stroke="#c4232b" stroke-width="1.6" marker-end="url(#arrow-accent)"/>
+
+      <!-- uploads → worker (read PDF) -->
+      <path d="M 616,516 V 532 Q 616,540 624,540 H 952 Q 960,540 960,532 V 356" fill="none" stroke="#4c5a8f" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+      <!-- worker → Firestore / cards / Apify -->
+      <line x1="896" y1="324" x2="852" y2="324" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="960" y1="292" x2="960" y2="224" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M 1004,356 V 476 Q 1004,484 1012,484 H 1064" fill="none" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- worker → IA -->
+      <path d="M 1024,308 H 1036 Q 1044,308 1044,300 V 272 Q 1044,264 1052,264 H 1064" fill="none" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <line x1="1024" y1="324" x2="1064" y2="324" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <path d="M 1024,340 H 1036 Q 1044,340 1044,348 V 376 Q 1044,384 1052,384 H 1064" fill="none" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- ============ ARROW LABELS (mask + 6–10px gap) ============ -->
+      <rect x="304" y="304" width="72" height="12" rx="2" fill="#f7faf7"/>
+      <text x="340" y="313" fill="#2f7d6b" font-size="8" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.02em">/api/* · /r/*</text>
+
+      <rect x="514" y="116" width="24" height="12" rx="2" fill="#f7faf7"/>
+      <text x="526" y="125" fill="#2f7d6b" font-size="8" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.04em">/*</text>
+
+      <rect x="760" y="172" width="52" height="12" rx="2" fill="#f7faf7"/>
+      <text x="786" y="181" fill="#2f7d6b" font-size="8" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.04em">/cards/*</text>
+
+      <rect x="584" y="398" width="24" height="12" rx="2" fill="#f7faf7"/>
+      <text x="596" y="407" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.04em">PDF</text>
+
+      <rect x="708" y="398" width="40" height="12" rx="2" fill="#f7faf7"/>
+      <text x="728" y="407" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.04em">encola</text>
+
+      <rect x="828" y="398" width="80" height="12" rx="2" fill="#f7faf7"/>
+      <text x="868" y="407" fill="#c4232b" font-size="8" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.02em">OIDC · sa-tasks</text>
+
+      <rect x="856" y="304" width="36" height="12" rx="2" fill="#f7faf7"/>
+      <text x="874" y="313" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.02em">estado</text>
+
+      <rect x="966" y="232" width="64" height="12" rx="2" fill="#f7faf7"/>
+      <text x="998" y="241" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.02em">certificado</text>
+
+      <rect x="858" y="520" width="44" height="12" rx="2" fill="#f7faf7"/>
+      <text x="880" y="529" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.02em">lee PDF</text>
+
+      <!-- ============ NODES ============ -->
+      <!-- Usuario (input) -->
+      <rect x="40" y="208" width="96" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="40" y="208" width="96" height="64" rx="6" fill="#4c5a8f" fill-opacity="0.10" stroke="#7d88b0" stroke-width="1"/>
+      <text x="88" y="242" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Usuario</text>
+      <text x="88" y="258" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">navegador</text>
+
+      <!-- Cloud Load Balancing (tall) -->
+      <rect x="172" y="112" width="128" height="244" rx="6" fill="#f7faf7"/>
+      <rect x="172" y="112" width="128" height="244" rx="6" fill="#22306b" fill-opacity="0.03" stroke="#22306b" stroke-opacity="0.30" stroke-width="1"/>
+      <rect x="180" y="118" width="20" height="12" rx="2" fill="none" stroke="#22306b" stroke-opacity="0.40" stroke-width="0.8"/>
+      <text x="190" y="127" fill="#22306b" fill-opacity="0.8" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">LB</text>
+      <text x="236" y="210" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Cloud Load</text>
+      <text x="236" y="225" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Balancing</text>
+      <text x="236" y="244" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">HTTPS global</text>
+      <text x="236" y="257" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">34.117.137.57.nip.io</text>
+      <text x="236" y="270" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">ruteo por path</text>
+
+      <!-- Cloud CDN -->
+      <rect x="380" y="112" width="120" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="380" y="112" width="120" height="64" rx="6" fill="#22306b" fill-opacity="0.03" stroke="#22306b" stroke-opacity="0.30" stroke-width="1"/>
+      <rect x="388" y="118" width="26" height="12" rx="2" fill="none" stroke="#22306b" stroke-opacity="0.40" stroke-width="0.8"/>
+      <text x="401" y="127" fill="#22306b" fill-opacity="0.8" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">CDN</text>
+      <text x="440" y="150" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Cloud CDN</text>
+      <text x="440" y="165" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">caché de buckets</text>
+
+      <!-- Cloud Armor -->
+      <rect x="380" y="292" width="120" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="380" y="292" width="120" height="64" rx="6" fill="#22306b" fill-opacity="0.03" stroke="#22306b" stroke-opacity="0.30" stroke-width="1"/>
+      <rect x="388" y="298" width="26" height="12" rx="2" fill="none" stroke="#22306b" stroke-opacity="0.40" stroke-width="0.8"/>
+      <text x="401" y="307" fill="#22306b" fill-opacity="0.8" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">WAF</text>
+      <text x="440" y="330" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Cloud Armor</text>
+      <text x="440" y="345" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">OWASP + rate limit</text>
+
+      <!-- bucket site -->
+      <rect x="552" y="104" width="128" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="552" y="104" width="128" height="64" rx="6" fill="#22306b" fill-opacity="0.05" stroke="#4c5a8f" stroke-width="1"/>
+      <rect x="560" y="110" width="26" height="12" rx="2" fill="none" stroke="#4c5a8f" stroke-opacity="0.50" stroke-width="0.8"/>
+      <text x="573" y="119" fill="#4c5a8f" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">GCS</text>
+      <text x="616" y="142" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">bucket site</text>
+      <text x="616" y="157" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">React estático</text>
+
+      <!-- bucket cards -->
+      <rect x="896" y="160" width="128" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="896" y="160" width="128" height="64" rx="6" fill="#22306b" fill-opacity="0.05" stroke="#4c5a8f" stroke-width="1"/>
+      <rect x="904" y="166" width="26" height="12" rx="2" fill="none" stroke="#4c5a8f" stroke-opacity="0.50" stroke-width="0.8"/>
+      <text x="917" y="175" fill="#4c5a8f" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">GCS</text>
+      <text x="960" y="198" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">bucket cards</text>
+      <text x="960" y="213" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">público · 1 día</text>
+
+      <!-- Cloud Run web -->
+      <rect x="552" y="292" width="128" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="552" y="292" width="128" height="64" rx="6" fill="#ffffff" stroke="#22306b" stroke-width="1"/>
+      <rect x="560" y="298" width="26" height="12" rx="2" fill="none" stroke="#22306b" stroke-opacity="0.40" stroke-width="0.8"/>
+      <text x="573" y="307" fill="#22306b" fill-opacity="0.8" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">RUN</text>
+      <text x="616" y="330" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">roastfolio-web</text>
+      <text x="616" y="345" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">API · /r/{id}</text>
+
+      <!-- Firestore -->
+      <rect x="724" y="292" width="128" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="724" y="292" width="128" height="64" rx="6" fill="#22306b" fill-opacity="0.05" stroke="#4c5a8f" stroke-width="1"/>
+      <rect x="732" y="298" width="20" height="12" rx="2" fill="none" stroke="#4c5a8f" stroke-opacity="0.50" stroke-width="0.8"/>
+      <text x="742" y="307" fill="#4c5a8f" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
+      <text x="788" y="330" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Firestore</text>
+      <text x="788" y="345" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">roasts · TTL 24 h</text>
+
+      <!-- Cloud Run worker (focal) -->
+      <rect x="896" y="292" width="128" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="896" y="292" width="128" height="64" rx="6" fill="#c4232b" fill-opacity="0.07" stroke="#c4232b" stroke-width="1.2"/>
+      <rect x="904" y="298" width="26" height="12" rx="2" fill="none" stroke="#c4232b" stroke-opacity="0.50" stroke-width="0.8"/>
+      <text x="917" y="307" fill="#c4232b" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">RUN</text>
+      <text x="960" y="330" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">roastfolio-worker</text>
+      <text x="960" y="345" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">ingress internal</text>
+
+      <!-- bucket uploads -->
+      <rect x="552" y="452" width="128" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="552" y="452" width="128" height="64" rx="6" fill="#22306b" fill-opacity="0.05" stroke="#4c5a8f" stroke-width="1"/>
+      <rect x="560" y="458" width="26" height="12" rx="2" fill="none" stroke="#4c5a8f" stroke-opacity="0.50" stroke-width="0.8"/>
+      <text x="573" y="467" fill="#4c5a8f" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">GCS</text>
+      <text x="616" y="490" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">bucket uploads</text>
+      <text x="616" y="505" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">privado · 1 día</text>
+
+      <!-- Cloud Tasks -->
+      <rect x="724" y="452" width="128" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="724" y="452" width="128" height="64" rx="6" fill="#22306b" fill-opacity="0.03" stroke="#22306b" stroke-opacity="0.30" stroke-width="1"/>
+      <rect x="732" y="458" width="30" height="12" rx="2" fill="none" stroke="#22306b" stroke-opacity="0.40" stroke-width="0.8"/>
+      <text x="747" y="467" fill="#22306b" fill-opacity="0.8" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">COLA</text>
+      <text x="788" y="490" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Cloud Tasks</text>
+      <text x="788" y="505" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">roasts · 4 intentos</text>
+
+      <!-- IA items (stacked inside the IA zone) -->
+      <rect x="1064" y="240" width="160" height="48" rx="6" fill="#f7faf7"/>
+      <rect x="1064" y="240" width="160" height="48" rx="6" fill="#22306b" fill-opacity="0.03" stroke="#22306b" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="1144" y="261" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Document AI</text>
+      <text x="1144" y="276" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">Layout Parser · us</text>
+
+      <rect x="1064" y="300" width="160" height="48" rx="6" fill="#f7faf7"/>
+      <rect x="1064" y="300" width="160" height="48" rx="6" fill="#22306b" fill-opacity="0.03" stroke="#22306b" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="1144" y="321" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Gemini</text>
+      <text x="1144" y="336" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">gemini-3.8-flash</text>
+
+      <rect x="1064" y="360" width="160" height="48" rx="6" fill="#f7faf7"/>
+      <rect x="1064" y="360" width="160" height="48" rx="6" fill="#22306b" fill-opacity="0.03" stroke="#22306b" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="1144" y="381" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Nano Banana</text>
+      <text x="1144" y="396" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">gemini-3.1-flash-lite-image</text>
+
+      <!-- Apify (external) -->
+      <rect x="1064" y="452" width="160" height="64" rx="6" fill="#f7faf7"/>
+      <rect x="1064" y="452" width="160" height="64" rx="6" fill="#22306b" fill-opacity="0.02" stroke="#22306b" stroke-opacity="0.35" stroke-width="1" stroke-dasharray="4,3"/>
+      <rect x="1072" y="458" width="26" height="12" rx="2" fill="none" stroke="#22306b" stroke-opacity="0.40" stroke-width="0.8"/>
+      <text x="1085" y="467" fill="#22306b" fill-opacity="0.8" font-size="7" font-family="'Courier Prime', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+      <text x="1144" y="484" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif" text-anchor="middle">Apify</text>
+      <text x="1144" y="497" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">perfil de LinkedIn</text>
+      <text x="1144" y="509" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace" text-anchor="middle">token en Secret Manager</text>
+
+      <!-- ============ CROSS-CUTTING BAND ============ -->
+      <rect x="40" y="580" width="1200" height="48" rx="6" fill="#22306b" fill-opacity="0.03" stroke="#22306b" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="56" y="608" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" letter-spacing="0.14em">TRANSVERSAL</text>
+      <line x1="156" y1="588" x2="156" y2="620" stroke="#22306b" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="172" y="600" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif">IAM · 4 cuentas de servicio</text>
+      <text x="172" y="615" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">sa-web · sa-worker · sa-tasks · sa-build</text>
+      <line x1="516" y1="588" x2="516" y2="620" stroke="#22306b" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="532" y="600" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif">Cloud Build + Artifact Registry</text>
+      <text x="532" y="615" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">CI/CD en cada push a main</text>
+      <line x1="876" y1="588" x2="876" y2="620" stroke="#22306b" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="892" y="600" fill="#22306b" font-size="12" font-weight="600" font-family="'Archivo', sans-serif">Cloud Logging / Monitoring</text>
+      <text x="892" y="615" fill="#4c5a8f" font-size="9" font-family="'Courier Prime', monospace">logs JSON · métricas · alerta · dashboard</text>
+
+      <!-- ============ LEGEND ============ -->
+      <line x1="40" y1="644" x2="1240" y2="644" stroke="#22306b" stroke-opacity="0.12" stroke-width="0.8"/>
+      <text x="40" y="666" fill="#4c5a8f" font-size="8" font-family="'Courier Prime', monospace" letter-spacing="0.18em">LEYENDA</text>
+
+      <rect x="120" y="657" width="14" height="10" rx="2" fill="#c4232b" fill-opacity="0.07" stroke="#c4232b" stroke-width="1"/>
+      <text x="140" y="665" fill="#4c5a8f" font-size="9" font-family="'Archivo', sans-serif">Foco: worker</text>
+
+      <rect x="232" y="657" width="14" height="10" rx="2" fill="#ffffff" stroke="#22306b" stroke-width="1"/>
+      <text x="252" y="665" fill="#4c5a8f" font-size="9" font-family="'Archivo', sans-serif">Código propio (Cloud Run)</text>
+
+      <rect x="392" y="657" width="14" height="10" rx="2" fill="#22306b" fill-opacity="0.03" stroke="#22306b" stroke-opacity="0.30" stroke-width="1"/>
+      <text x="412" y="665" fill="#4c5a8f" font-size="9" font-family="'Archivo', sans-serif">Servicio administrado</text>
+
+      <rect x="532" y="657" width="14" height="10" rx="2" fill="#22306b" fill-opacity="0.05" stroke="#4c5a8f" stroke-width="1"/>
+      <text x="552" y="665" fill="#4c5a8f" font-size="9" font-family="'Archivo', sans-serif">Almacenamiento</text>
+
+      <rect x="648" y="657" width="14" height="10" rx="2" fill="#22306b" fill-opacity="0.02" stroke="#22306b" stroke-opacity="0.35" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="668" y="665" fill="#4c5a8f" font-size="9" font-family="'Archivo', sans-serif">Externo</text>
+
+      <line x1="736" y1="662" x2="764" y2="662" stroke="#2f7d6b" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+      <text x="772" y="665" fill="#4c5a8f" font-size="9" font-family="'Archivo', sans-serif">Tráfico del usuario</text>
+
+      <line x1="888" y1="662" x2="916" y2="662" stroke="#c4232b" stroke-width="1.6" marker-end="url(#arrow-accent)"/>
+      <text x="924" y="665" fill="#4c5a8f" font-size="9" font-family="'Archivo', sans-serif">Salto asíncrono</text>
+
+      <line x1="1024" y1="662" x2="1052" y2="662" stroke="#4c5a8f" stroke-width="1.2" marker-end="url(#arrow)"/>
+      <text x="1060" y="665" fill="#4c5a8f" font-size="9" font-family="'Archivo', sans-serif">Escritura / llamada</text>
+
+      <line x1="1160" y1="662" x2="1188" y2="662" stroke="#4c5a8f" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <text x="1196" y="665" fill="#4c5a8f" font-size="9" font-family="'Archivo', sans-serif">Lectura</text>
+    </svg>

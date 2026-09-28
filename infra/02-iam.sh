@@ -29,8 +29,8 @@ grant_project "$SA_WEB" roles/datastore.user            # Firestore read/write
 grant_project "$SA_WORKER" roles/datastore.user
 grant_project "$SA_WORKER" roles/documentai.apiUser
 grant_project "$SA_WORKER" roles/aiplatform.user         # Gemini + Nano Banana on Vertex
-grant_project "$SA_BUILD" roles/run.developer            # deploy new revisions
 grant_project "$SA_BUILD" roles/logging.logWriter        # build logs
+# sa-build's run.developer is granted per service in 09-run.sh, not on the whole project.
 
 say "actAs grants"
 # web mints OIDC tokens as sa-tasks when it creates tasks.

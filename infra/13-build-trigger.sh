@@ -12,22 +12,33 @@ SRC_BUCKET="gs://${PROJECT_ID}_cloudbuild"
 exists gcloud storage buckets describe "$SRC_BUCKET" || gcloud storage buckets create "$SRC_BUCKET" --location=US
 gcloud storage buckets add-iam-policy-binding "$SRC_BUCKET" \
   --member="serviceAccount:$SA_BUILD" --role=roles/storage.objectViewer >/dev/null
-# The Cloud Build service agent stores the GitHub token in Secret Manager for the connection.
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --condition=None --quiet \
-  --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-cloudbuild.iam.gserviceaccount.com" \
-  --role=roles/secretmanager.admin >/dev/null
 echo "  done"
 
 say "2. GitHub connection (2nd gen)"
-if ! exists gcloud builds connections describe "$CONNECTION" --region="$REGION"; then
-  gcloud builds connections create github "$CONNECTION" --region="$REGION"
-fi
-STAGE="$(gcloud builds connections describe "$CONNECTION" --region="$REGION" --format='value(installationState.stage)')"
+CB_AGENT="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-cloudbuild.iam.gserviceaccount.com"
+STAGE="$(gcloud builds connections describe "$CONNECTION" --region="$REGION" \
+  --format='value(installationState.stage)' 2>/dev/null || true)"
 if [[ "$STAGE" != "COMPLETE" ]]; then
+  # Only while authorizing: the Cloud Build service agent creates the secret that holds the GitHub token.
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" --condition=None --quiet \
+    --member="$CB_AGENT" --role=roles/secretmanager.admin >/dev/null
+  exists gcloud builds connections describe "$CONNECTION" --region="$REGION" ||
+    gcloud builds connections create github "$CONNECTION" --region="$REGION"
   echo "  Open this link, authorize Cloud Build and install the app on $GITHUB_REPO, then run this script again:"
   gcloud builds connections describe "$CONNECTION" --region="$REGION" --format='value(installationState.actionUri)'
   exit 0
 fi
+
+say "2b. Least privilege: the service agent keeps read access to its token secret only"
+TOKEN_SECRET="$(gcloud builds connections describe "$CONNECTION" --region="$REGION" \
+  --format='value(githubConfig.authorizerCredential.oauthTokenSecretVersion)' | cut -d/ -f6)"
+# The token secret is regional: gcloud needs the regional endpoint, not just --location.
+CLOUDSDK_API_ENDPOINT_OVERRIDES_SECRETMANAGER="https://secretmanager.${REGION}.rep.googleapis.com/" \
+  gcloud secrets add-iam-policy-binding "$TOKEN_SECRET" --location="$REGION" \
+  --member="$CB_AGENT" --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+gcloud projects remove-iam-policy-binding "$PROJECT_ID" --condition=None --quiet \
+  --member="$CB_AGENT" --role=roles/secretmanager.admin >/dev/null 2>&1 || true
+echo "  $TOKEN_SECRET -> secretAccessor"
 
 say "3. Link repository"
 exists gcloud builds repositories describe "$REPO_NAME" --connection="$CONNECTION" --region="$REGION" ||

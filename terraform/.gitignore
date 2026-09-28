@@ -1,0 +1,6 @@
+# Provider plugins and local state. Commit .terraform.lock.hcl.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log

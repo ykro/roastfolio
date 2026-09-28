@@ -4,7 +4,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 from pypdf import PdfWriter
+from pypdf.errors import ParseError
 
+from app import validation
 from app.config import Settings
 from app.main import create_app, render_share_page
 from app.validation import InvalidInput, normalize_linkedin
@@ -101,6 +103,17 @@ def test_pdf_limits(env):
     big = b"%PDF-1.4\n" + b"0" * (5 * 1024 * 1024 + 1)
     r = post(client, files={"pdf": ("cv.pdf", big, "application/pdf")})
     assert r.status_code == 400 and "5 MB" in r.json()["detail"]
+
+
+@pytest.mark.parametrize("exc", [ParseError("bad xref"), IndexError("list index"), TypeError("NoneType")])
+def test_broken_pdf_is_a_400_not_a_500(env, monkeypatch, exc):
+    def explode(*a, **k):
+        raise exc
+
+    monkeypatch.setattr(validation, "PdfReader", explode)
+    client, _, _ = env
+    r = post(client, files={"pdf": ("cv.pdf", make_pdf(1), "application/pdf")})
+    assert r.status_code == 400 and "dañado" in r.json()["detail"]
 
 
 def test_both_inputs_rejected(env):

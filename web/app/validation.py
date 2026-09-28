@@ -4,7 +4,6 @@ import io
 import re
 
 from pypdf import PdfReader
-from pypdf.errors import PdfReadError
 
 INTENSITIES = ("soft", "medium", "brutal")
 LINKEDIN = re.compile(
@@ -27,9 +26,9 @@ def check_pdf(data: bytes, max_bytes: int, max_pages: int) -> int:
         if reader.is_encrypted and not reader.decrypt(""):
             raise InvalidInput("El PDF está protegido con contraseña.")
         pages = len(reader.pages)
-    except (PdfReadError, ValueError, KeyError) as exc:
-        if isinstance(exc, InvalidInput):
-            raise
+    except InvalidInput:
+        raise
+    except Exception as exc:  # pypdf raises all kinds of errors on broken or crafted files
         raise InvalidInput("No pudimos abrir el PDF. ¿Está dañado?") from exc
     if pages > max_pages:
         raise InvalidInput(f"El PDF tiene {pages} páginas; el máximo es {max_pages}.")

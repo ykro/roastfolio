@@ -36,3 +36,10 @@ gcloud run deploy "$WEB_SERVICE" --image="$AR/web:latest" --region="$REGION" \
   --set-env-vars="PROJECT_ID=$PROJECT_ID,FIRESTORE_DB=$FIRESTORE_DB,UPLOADS_BUCKET=$UPLOADS_BUCKET,SITE_BUCKET=$SITE_BUCKET,TASKS_LOCATION=$REGION,TASKS_QUEUE=$QUEUE,WORKER_URL=$WORKER_URL,TASKS_SA_EMAIL=$SA_TASKS,PUBLIC_BASE_URL=$PUBLIC_BASE_URL" \
   --quiet
 echo "  worker: $WORKER_URL"
+
+say "sa-build may deploy these two services (and no other service in the project)"
+for svc in "$WORKER_SERVICE" "$WEB_SERVICE"; do
+  gcloud run services add-iam-policy-binding "$svc" --region="$REGION" \
+    --member="serviceAccount:$SA_BUILD" --role=roles/run.developer --quiet >/dev/null
+done
+echo "  done"

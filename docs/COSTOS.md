@@ -107,7 +107,7 @@ Escenarios: **(a)** 1,000 usuarios (1,500 roasts), **(b)** 10,000 usuarios (15,0
 
 **Sin ninguna capa gratuita** (si la cuenta de facturación ya la gastó), Cloud Run suma $1.69 en (a) y $5.22 más en (b), y Cloud Build $0.54. Firestore y Storage agregan centavos. Esto importa porque **las capas gratuitas son por cuenta de facturación, no por proyecto**.
 
-**Monitoring:** las alertas no se cobran todavía. Desde el 1 de septiembre de 2027 costarán $0.35 por referencia a una métrica, así que la alerta de tasa de error (2 métricas) pasará a unos $0.70 al mes.
+**Monitoring:** las alertas no se cobran todavía. No antes del 1 de septiembre de 2027 costarán $0.35 por referencia a una métrica, así que la alerta de tasa de error (2 métricas) pasará a unos $0.70 al mes.
 
 ## Supuestos y mediciones
 

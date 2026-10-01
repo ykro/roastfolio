@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Three buckets: site (public, CDN), uploads (private, 1-day lifecycle), cards (public, CDN, 1-day lifecycle).
+# uploads and cards have soft delete off: a CV promised gone in 24 h must not stay restorable for 7 more days.
 source "$(dirname "$0")/env.sh"
 
 LIFECYCLE="$GEN_DIR/lifecycle-1d.json"
@@ -27,14 +28,14 @@ public_read() {
 }
 
 say "uploads: private + lifecycle"
-gcloud storage buckets update "gs://$UPLOADS_BUCKET" --public-access-prevention --lifecycle-file="$LIFECYCLE"
+gcloud storage buckets update "gs://$UPLOADS_BUCKET" --public-access-prevention --lifecycle-file="$LIFECYCLE" --clear-soft-delete
 gcloud storage buckets add-iam-policy-binding "gs://$UPLOADS_BUCKET" \
   --member="serviceAccount:$SA_WEB" --role=roles/storage.objectCreator >/dev/null
 gcloud storage buckets add-iam-policy-binding "gs://$UPLOADS_BUCKET" \
   --member="serviceAccount:$SA_WORKER" --role=roles/storage.objectViewer >/dev/null
 
 say "cards: public read by name (backend buckets need it) + lifecycle"
-gcloud storage buckets update "gs://$CARDS_BUCKET" --lifecycle-file="$LIFECYCLE"
+gcloud storage buckets update "gs://$CARDS_BUCKET" --lifecycle-file="$LIFECYCLE" --clear-soft-delete
 public_read "gs://$CARDS_BUCKET"
 # objectUser (not objectCreator) so a retried task can overwrite a half-written card.
 gcloud storage buckets add-iam-policy-binding "gs://$CARDS_BUCKET" \

@@ -25,6 +25,11 @@ resource "google_storage_bucket" "uploads" {
     }
   }
 
+  # No soft delete: a CV promised gone in 24 h must not stay restorable for 7 more days.
+  soft_delete_policy {
+    retention_duration_seconds = 0
+  }
+
   depends_on = [google_project_service.apis]
 }
 
@@ -40,6 +45,11 @@ resource "google_storage_bucket" "cards" {
     condition {
       age = 1
     }
+  }
+
+  # No soft delete: a CV promised gone in 24 h must not stay restorable for 7 more days.
+  soft_delete_policy {
+    retention_duration_seconds = 0
   }
 
   depends_on = [google_project_service.apis]
